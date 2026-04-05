@@ -1,22 +1,21 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import WikiHeader from "@/components/WikiHeader";
+import WikiTabs from "@/components/WikiTabs";
 import "@/styles/globals.css";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "WikiPeople",
-  description: "A Wikipedia-style encyclopedia generator",
+  description: "Your own Wikipedia, generated from LinkedIn",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body>
+        <WikiHeader encyclopediaName="WikiPeople" />
+        <WikiTabs />
+        <main>{children}</main>
+      </body>
     </html>
   );
 }

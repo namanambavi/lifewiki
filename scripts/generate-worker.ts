@@ -240,7 +240,7 @@ async function main() {
     logEntry(`Generated: ${personEntity.title}`, "article");
 
     // Generate main page + index immediately so the UI can render
-    await generateMainPageData(profile, plan, personSlug);
+    await generateMainPageData(profile, plan, personSlug, research);
     await generateIndex(plan, personSlug);
 
     // Mark as "ready" — the UI redirects now, remaining articles generate in background

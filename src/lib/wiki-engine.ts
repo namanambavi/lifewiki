@@ -316,30 +316,35 @@ export function parseGeneratedArticle(
 export async function generateMainPageData(
   profile: LinkedInProfile,
   plan: EntityPlan[],
-  personSlug: string
+  personSlug: string,
+  research?: string
 ): Promise<void> {
   const firstName = profile.name.split(" ")[0];
   const encyclopediaName = `${firstName}opedia`;
 
-  const factsPrompt = `Based on this person's profile and encyclopedia articles, generate 5 interesting "Did you know..." facts.
+  // Use research context for facts and summary so the LLM doesn't hallucinate
+  const researchContext = research?.slice(0, 3000) || `${profile.headline}. ${profile.summary || ""}`;
 
-Person: ${profile.name}
-Headline: ${profile.headline}
-Companies: ${profile.positions.map((p) => p.company).join(", ")}
-Education: ${profile.education.map((e) => e.school).join(", ")}
+  const factsPrompt = `Based on this research, generate 5 interesting "Did you know..." facts for an encyclopedia main page.
+
+## Research
+${researchContext}
+
+## Person
+${profile.name}
 
 Available articles for linking:
 ${plan.map((e) => `- ${e.slug} (${e.title})`).join("\n")}
 
 Return a JSON array: [{"fact": "...that [[Person]] did X at [[Company]]?", "relatedArticles": ["slug1"]}]
-Make facts specific, surprising, and use [[wikilinks]].`;
+Make facts specific, surprising, grounded in the research, and use [[wikilinks]].`;
 
   const didYouKnow = await generateJSON<DidYouKnow[]>(factsPrompt);
 
   const featuredSlug =
     plan.find((e) => e.type === "person")?.slug ?? plan[0].slug;
   const featuredSummary = await generateText(
-    `Write a 2-3 sentence encyclopedia summary of ${profile.name}. ${profile.headline}. ${profile.summary?.slice(0, 300) || ""}`
+    `Based on this research, write a 2-3 sentence encyclopedia summary of ${profile.name}.\n\nResearch:\n${researchContext}`
   );
 
   const portalCounts: Record<string, { count: number; slug: string }> = {};

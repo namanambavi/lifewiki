@@ -54,6 +54,12 @@ export default function GenerateForm() {
           const statusRes = await fetch(`/api/status/${actualSlug}`);
           const statusData: GenerationStatus = await statusRes.json();
           setStatus(statusData);
+          // Redirect as soon as there's at least 1 article (progressive rendering)
+          // The wiki is viewable now — remaining articles generate in background
+          if (statusData.completedArticles > 0 && statusData.phase === "generating") {
+            clearInterval(poll);
+            router.push(`/${actualSlug}`);
+          }
           if (statusData.phase === "complete") {
             clearInterval(poll);
             router.push(`/${actualSlug}`);

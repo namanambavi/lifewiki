@@ -93,18 +93,39 @@ async function updateStatus(status: GenerationStatus): Promise<void> {
 
 async function researchWithTimeout(prompt: string, timeoutMs = 180000): Promise<string> {
   let researchReport = "";
+  let lastAssistantText = "";
 
   const researchPromise = (async () => {
     for await (const message of query({
       prompt,
       options: { allowedTools: ["WebSearch", "WebFetch"], maxTurns: 25 },
     })) {
-      if ("result" in message && typeof message.result === "string") {
-        researchReport = message.result;
-        return researchReport; // Got the result, don't wait for iterator to close
+      const msg = message as Record<string, unknown>;
+
+      // Capture the final result
+      if (msg.type === "result" && typeof msg.result === "string") {
+        researchReport = msg.result;
+        return researchReport;
+      }
+
+      // Also capture assistant messages (the research text accumulates here)
+      if (msg.type === "assistant" && msg.message) {
+        const assistantMsg = msg.message as Record<string, unknown>;
+        if (Array.isArray(assistantMsg.content)) {
+          for (const block of assistantMsg.content) {
+            if ((block as Record<string, unknown>).type === "text") {
+              lastAssistantText = (block as Record<string, unknown>).text as string;
+              logEntry(`Research in progress (${lastAssistantText.length} chars)...`, "research");
+              void updateStatus({
+                phase: "fetching", totalArticles: 0, completedArticles: 0,
+                currentArticle: "Researching via web search...",
+              });
+            }
+          }
+        }
       }
     }
-    return researchReport;
+    return researchReport || lastAssistantText;
   })();
 
   const timeoutPromise = new Promise<string>((_, reject) =>
@@ -114,8 +135,12 @@ async function researchWithTimeout(prompt: string, timeoutMs = 180000): Promise<
   try {
     return await Promise.race([researchPromise, timeoutPromise]);
   } catch {
-    // Timeout hit — use whatever research was collected so far
-    if (researchReport.length > 0) return researchReport;
+    // Timeout hit — use whatever was collected (result OR last assistant text)
+    const collected = researchReport || lastAssistantText;
+    if (collected.length > 0) {
+      logEntry(`Research timed out but collected ${collected.length} chars. Using partial results.`, "info");
+      return collected;
+    }
     throw new Error("Research timed out with no results");
   }
 }
@@ -226,20 +251,39 @@ async function main() {
     const plan = await planFromResearch(profile, research);
     logEntry(`Planning ${plan.length} articles...`, "info");
 
-    // Phase 2: Generate articles
-    await updateStatus({ phase: "generating", totalArticles: plan.length, completedArticles: 0, currentArticle: "" });
-
+    // Phase 2a: Generate the PERSON article first (fast path to visible wiki)
     const wikiDir = getWikiDir(personSlug);
     await fs.mkdir(wikiDir, { recursive: true });
 
+    const personEntity = plan.find((e) => e.type === "person") || plan[0];
+    const systemPrompt = "You are a Wikipedia article writer. Write in a neutral, encyclopedic tone. Return raw Markdown with YAML frontmatter — no code fences.";
+
+    logEntry(`Generating main article: ${personEntity.title}`, "article");
+    await updateStatus({ phase: "generating", totalArticles: plan.length, completedArticles: 0, currentArticle: personEntity.title });
+
+    const personText = await generateText(buildArticlePrompt(personEntity, profile, plan), systemPrompt);
+    const personArticle = parseGeneratedArticle(personText, personEntity);
+    await writeArticle(personArticle, wikiDir);
+    logEntry(`Generated: ${personEntity.title}`, "article");
+
+    // Generate main page + index immediately so the UI can render
+    await generateMainPageData(profile, plan, personSlug);
+    await generateIndex(plan, personSlug);
+
+    // Mark as "ready" — the UI redirects now, remaining articles generate in background
+    logEntry(`Wiki is live! Generating ${plan.length - 1} more articles...`, "info");
+    await updateStatus({ phase: "generating", totalArticles: plan.length, completedArticles: 1, currentArticle: "Wiki is live — generating remaining articles..." });
+
+    // Phase 2b: Generate remaining articles in parallel batches
+    const remainingPlan = plan.filter((e) => e.slug !== personEntity.slug);
     const BATCH_SIZE = 10;
-    let completed = 0;
-    for (let i = 0; i < plan.length; i += BATCH_SIZE) {
-      const batch = plan.slice(i, i + BATCH_SIZE);
+    let completed = 1;
+
+    for (let i = 0; i < remainingPlan.length; i += BATCH_SIZE) {
+      const batch = remainingPlan.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
         batch.map(async (entity) => {
-          const prompt = buildArticlePrompt(entity, profile, plan);
-          const text = await generateText(prompt, "You are a Wikipedia article writer. Write in a neutral, encyclopedic tone. Return raw Markdown with YAML frontmatter — no code fences.");
+          const text = await generateText(buildArticlePrompt(entity, profile, plan), systemPrompt);
           return { entity, text };
         })
       );
@@ -251,11 +295,12 @@ async function main() {
         logEntry(`Generated: ${entity.title}`, "article");
         await updateStatus({ phase: "generating", totalArticles: plan.length, completedArticles: completed, currentArticle: entity.title });
       }
+
+      // Re-generate index after each batch so new articles are immediately navigable
+      await generateIndex(plan.filter((_, idx) => idx < i + BATCH_SIZE + 1 || plan[idx] === personEntity), personSlug);
     }
 
-    // Phase 3: Finalize
-    await updateStatus({ phase: "finalizing", totalArticles: plan.length, completedArticles: completed, currentArticle: "Main page & index" });
-    await generateMainPageData(profile, plan, personSlug);
+    // Final index with all articles
     await generateIndex(plan, personSlug);
 
     // Done

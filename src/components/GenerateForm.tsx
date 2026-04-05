@@ -193,7 +193,7 @@ export default function GenerateForm() {
         <button
           type="submit"
           onClick={(e) => { e.preventDefault(); startGeneration(); }}
-          disabled={loading || !input.trim()}
+          disabled={loading}
           style={{
             background: loading ? "#8899bb" : "#36c",
             color: "#fff",

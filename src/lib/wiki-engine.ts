@@ -62,40 +62,44 @@ export async function planFromResearch(
   profile: LinkedInProfile,
   research: string
 ): Promise<EntityPlan[]> {
-  const planPrompt = `Based on this research about ${profile.name}, create a detailed article plan for their personal encyclopedia.
+  // Ask the LLM for a SLIM plan (just titles/types/slugs — no dataContext).
+  // This keeps the response small and fast (~2K tokens instead of 15K+).
+  // We attach the research text as dataContext in code afterward.
+  const planPrompt = `Based on this research, list every entity that deserves a Wikipedia article.
 
-## Research Report
-${research}
+## Research
+${research.slice(0, 6000)}
 
-## LinkedIn Profile (source of truth for career facts)
-Name: ${profile.name}
-Positions: ${profile.positions.map((p) => `${p.title} at ${p.company}`).join(", ")}
-Education: ${profile.education.map((e) => `${e.degree} from ${e.school}`).join(", ")}
-Skills: ${profile.skills.slice(0, 15).join(", ")}
-Location: ${profile.location}
+## Person
+${profile.name}
 
-## Instructions
-Return a JSON array of article plans. Each entry:
-{
-  "slug": "category/article-name" (e.g. "companies/google", "people/naman-ambavi"),
-  "title": "Article Title",
-  "type": "person|company|education|technology|place|career|event|project|publication",
-  "dataContext": "ALL relevant information for writing this article — combine LinkedIn data AND research findings. This is the ONLY input the article writer sees, so include everything."
-}
+Return a JSON array. Each entry has ONLY these 3 fields:
+{"slug": "category/name", "title": "Display Title", "type": "person|company|education|technology|place|career"}
 
-Rules:
-- Always include: 1 main person article, 1 per company, 1 per school, top 10 skills, location, career timeline
-- Also include any events, projects, publications, or notable entities discovered in research
-- The dataContext must be RICH — include specific facts, dates, numbers from the research
-- 30-60 articles total for a thorough encyclopedia`;
+Example:
+[
+  {"slug": "people/naman-ambavi", "title": "Naman Ambavi", "type": "person"},
+  {"slug": "companies/oximy", "title": "Oximy", "type": "company"}
+]
 
-  const plan = await generateJSON<EntityPlan[]>(planPrompt);
+Include: the person, every company mentioned, every school, top skills, locations, career timeline.
+15-30 entries. Just the slug, title, type. Nothing else.`;
 
-  if (!Array.isArray(plan) || plan.length === 0) {
+  type SlimPlan = { slug: string; title: string; type: string }[];
+  const slimPlan = await generateJSON<SlimPlan>(planPrompt);
+
+  if (!Array.isArray(slimPlan) || slimPlan.length === 0) {
     return fallbackPlan(profile);
   }
 
-  return plan;
+  // Attach the FULL research as dataContext to every article.
+  // The article writer prompt will have access to all research + the entity name.
+  return slimPlan.map((entry) => ({
+    slug: entry.slug,
+    title: entry.title,
+    type: entry.type as EntityPlan["type"],
+    dataContext: research, // full research available to each article writer
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -218,10 +222,17 @@ export function buildArticlePrompt(
     .map((e) => `[[${e.title}]]`)
     .join(", ");
 
+  // Truncate research context to avoid huge prompts (each article gets the full research)
+  const research = entity.dataContext.length > 5000
+    ? entity.dataContext.slice(0, 5000) + "\n\n[research truncated]"
+    : entity.dataContext;
+
   return `You are writing a Wikipedia-style encyclopedia article about "${entity.title}" (type: ${entity.type}).
 
+IMPORTANT: Focus ONLY on information about "${entity.title}" from the research below. Extract every detail relevant to this specific entity.
+
 ## Research context
-${entity.dataContext}
+${research}
 
 ## Other articles in this encyclopedia (use [[wikilinks]] to cross-reference)
 ${otherArticles}

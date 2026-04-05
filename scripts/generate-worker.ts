@@ -7,10 +7,13 @@
  * Usage: npx tsx scripts/generate-worker.ts <personSlug> <profilePath>
  */
 
+import "dotenv/config"; // Load .env.local when running standalone (not via Next.js)
+import dotenv from "dotenv";
+dotenv.config({ path: ".env.local" });
+
 import fs from "fs/promises";
 import path from "path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import Anthropic from "@anthropic-ai/sdk";
 import type {
   LinkedInProfile,
   EntityPlan,
@@ -26,6 +29,7 @@ import {
   generateMainPageData,
   generateIndex,
 } from "../src/lib/wiki-engine";
+import { generateText, generateJSON } from "../src/lib/llm";
 import { writeArticle, getWikiDir, getRawDir } from "../src/lib/wiki-io";
 
 // ---------------------------------------------------------------------------
@@ -47,23 +51,6 @@ if (!personSlug || !profilePath) {
 const USERS_DIR = path.join(process.cwd(), "data/users");
 const PERSON_DIR = path.join(USERS_DIR, personSlug);
 const STATUS_FILE = path.join(PERSON_DIR, "generation-status.json");
-
-// ---------------------------------------------------------------------------
-// LLM helpers (direct Anthropic SDK)
-// ---------------------------------------------------------------------------
-
-const anthropic = new Anthropic();
-
-async function generateText(prompt: string, systemPrompt?: string): Promise<string> {
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 4096,
-    system: systemPrompt || "You are a Wikipedia article writer. Write in a neutral, encyclopedic tone.",
-    messages: [{ role: "user", content: prompt }],
-  });
-  const textBlock = message.content.find((b) => b.type === "text");
-  return textBlock ? textBlock.text : "";
-}
 
 // ---------------------------------------------------------------------------
 // Status + Logging

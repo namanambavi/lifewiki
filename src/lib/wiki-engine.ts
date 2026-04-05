@@ -395,16 +395,23 @@ Make facts specific, surprising, grounded in the research, and use [[wikilinks]]
       count,
       slug,
     })),
-    recentPeople: (profile.connections || []).slice(0, 5).map((c) => ({
-      name: c.name,
-      description: c.headline,
-      slug: `people/${slugify(c.name)}`,
-    })),
-    careerTimeline: profile.positions.map((p) => ({
-      year: p.startDate,
-      event: `${p.title} at ${p.company}`,
-      slug: `companies/${slugify(p.company)}`,
-    })),
+    // Populate from plan data (profile may be empty when using name-only mode)
+    recentPeople: plan
+      .filter((e) => e.type === "person" && e.title !== profile.name)
+      .slice(0, 5)
+      .map((e) => ({
+        name: e.title,
+        description: "",
+        slug: e.slug,
+      })),
+    careerTimeline: plan
+      .filter((e) => e.type === "company" || e.type === "career")
+      .slice(0, 8)
+      .map((e) => ({
+        year: "",
+        event: e.title,
+        slug: e.slug,
+      })),
   };
 
   const wikiDir = getWikiDir(personSlug);

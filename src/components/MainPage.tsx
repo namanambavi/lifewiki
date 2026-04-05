@@ -99,7 +99,7 @@ export default function MainPage({ data, personSlug }: MainPageProps) {
               <ul>
                 {data.careerTimeline.map((entry, index) => (
                   <li key={index}>
-                    <b>{entry.year}</b> &mdash;{" "}
+                    {entry.year && <><b>{entry.year}</b> &mdash; </>}
                     <a href={`${prefix}/wiki/${entry.slug}`}>{entry.event}</a>
                   </li>
                 ))}

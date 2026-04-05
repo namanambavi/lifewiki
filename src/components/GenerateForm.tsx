@@ -16,7 +16,11 @@ export default function GenerateForm() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify(
+          url.trim().includes("linkedin.com")
+            ? { url: url.trim() }
+            : { name: url.trim() }
+        ),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -37,10 +41,10 @@ export default function GenerateForm() {
   return (
     <div style={{ textAlign: "center", padding: "80px 20px" }}>
       <h1 style={{ fontSize: "28px", marginBottom: "8px", fontFamily: "'Linux Libertine', Georgia, serif" }}>WikiPeople</h1>
-      <p style={{ marginBottom: "24px", color: "#54595d", fontFamily: "sans-serif", fontSize: "14px" }}>Paste a LinkedIn URL. Get your own Wikipedia.</p>
+      <p style={{ marginBottom: "24px", color: "#54595d", fontFamily: "sans-serif", fontSize: "14px" }}>Paste a LinkedIn URL or type any name. Get your own Wikipedia.</p>
       {!status && (
         <form onSubmit={handleGenerate} style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-          <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="linkedin.com/in/yourname" style={{ padding: "8px 12px", border: "2px solid #36c", borderRadius: "4px", width: "400px", fontSize: "14px" }} />
+          <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="linkedin.com/in/yourname or a name like 'Elon Musk'" style={{ padding: "8px 12px", border: "2px solid #36c", borderRadius: "4px", width: "400px", fontSize: "14px" }} />
           <button type="submit" style={{ background: "#36c", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "4px", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}>Generate Wiki</button>
         </form>
       )}

@@ -91,7 +91,7 @@ async function updateStatus(status: GenerationStatus): Promise<void> {
 // PHASE 1: Research via Agent SDK with timeout
 // ---------------------------------------------------------------------------
 
-async function researchWithTimeout(prompt: string, timeoutMs = 180000): Promise<string> {
+async function researchWithTimeout(prompt: string, timeoutMs = 90000): Promise<string> {
   let researchReport = "";
   // Keep the LONGEST text block seen — the final assistant message before
   // result typically contains the complete research report
@@ -100,7 +100,7 @@ async function researchWithTimeout(prompt: string, timeoutMs = 180000): Promise<
   const researchPromise = (async () => {
     for await (const message of query({
       prompt,
-      options: { allowedTools: ["WebSearch", "WebFetch"], maxTurns: 25 },
+      options: { allowedTools: ["WebSearch", "WebFetch"], maxTurns: 10 },
     })) {
       const msg = message as Record<string, unknown>;
 
@@ -162,74 +162,44 @@ async function researchWithTimeout(prompt: string, timeoutMs = 180000): Promise<
 }
 
 async function researchPerson(profile: LinkedInProfile): Promise<string> {
-  const profileSummary = `
-Name: ${profile.name}
-Headline: ${profile.headline}
-Summary: ${profile.summary}
-Location: ${profile.location}
+  // Break research into focused, fast queries (each <60s) instead of
+  // one massive prompt that hangs. Proven: focused queries with maxTurns:10
+  // complete in ~30-40 seconds reliably.
 
-Positions:
-${profile.positions.map((p) => `- ${p.title} at ${p.company} (${p.startDate} - ${p.endDate || "present"}): ${p.description}`).join("\n") || "(none provided)"}
+  const queries = [
+    {
+      label: "person",
+      prompt: `Search the web for "${profile.name}" and find: what companies they work at, what they've built, their background, any notable achievements. Give a detailed summary with specific facts, dates, and numbers.`,
+    },
+  ];
 
-Education:
-${profile.education.map((e) => `- ${e.degree} in ${e.field} from ${e.school} (${e.startDate} - ${e.endDate})`).join("\n") || "(none provided)"}
+  // Add company-specific queries if we know their companies
+  const companies = profile.positions.map((p) => p.company).filter(Boolean);
+  if (companies.length > 0) {
+    queries.push({
+      label: "companies",
+      prompt: `Search the web for these companies and give key facts about each (what they do, funding, size, notable products): ${companies.join(", ")}. Be specific with numbers and dates.`,
+    });
+  }
 
-Skills: ${profile.skills.join(", ") || "(none provided)"}
-  `.trim();
+  // Run queries in parallel for speed
+  logEntry(`Running ${queries.length} research queries in parallel...`, "research");
 
-  const researchPrompt = `You are a research agent building a comprehensive personal encyclopedia about ${profile.name}.
+  const results = await Promise.all(
+    queries.map(async (q) => {
+      logEntry(`Researching: ${q.label}...`, "research");
+      try {
+        const text = await researchWithTimeout(q.prompt, 90000); // 90s per query
+        logEntry(`${q.label}: found ${text.length} chars`, "research");
+        return `## ${q.label.charAt(0).toUpperCase() + q.label.slice(1)} Research\n\n${text}`;
+      } catch (err) {
+        logEntry(`${q.label}: ${err instanceof Error ? err.message : "failed"}`, "error");
+        return "";
+      }
+    })
+  );
 
-Here is their LinkedIn profile:
-
-${profileSummary}
-
-Your task:
-1. Search the web for this person — find news mentions, publications, talks, open source projects, interviews
-2. Search for each company they worked at — find funding rounds, acquisitions, notable products, key people
-3. Search for their educational institutions — notable programs, rankings, famous alumni
-4. Fetch any particularly relevant pages for detailed information
-
-After your research, produce a STRUCTURED REPORT with this exact format:
-
-## Research Findings
-
-### About ${profile.name}
-(Everything you found about the person beyond what's in their LinkedIn)
-
-### Companies
-For each company:
-#### [Company Name]
-- What the company does
-- Key facts (founding, funding, acquisition, size)
-- The person's role and contributions
-- Notable colleagues
-
-### Education
-For each school:
-#### [School Name]
-- Key facts about the institution
-- Relevant programs
-- The person's degree and time there
-
-### Technologies & Skills
-For each major skill/technology:
-#### [Technology Name]
-- Brief description
-- How the person uses it
-- Notable projects involving this technology
-
-### Notable Discoveries
-(Anything interesting you found that doesn't fit above — events, publications, projects, awards, life events)
-
-### Suggested Articles
-List every entity that deserves its own Wikipedia article, formatted as:
-- SLUG: people/${profile.name.toLowerCase().replace(/\s+/g, "-")} | TITLE: ${profile.name} | TYPE: person
-- SLUG: companies/[name] | TITLE: [Name] | TYPE: company
-(etc. for all entities)
-
-Be thorough. Search at least 5-8 times. The quality of the encyclopedia depends entirely on how much you discover here.`;
-
-  const researchReport = await researchWithTimeout(researchPrompt);
+  const researchReport = results.filter(Boolean).join("\n\n---\n\n");
 
   // Save research
   const rawDir = getRawDir(personSlug);

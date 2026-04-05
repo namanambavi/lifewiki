@@ -1,7 +1,8 @@
 import path from "path";
 import fs from "fs/promises";
 import matter from "gray-matter";
-import { generateText, generateJSON, generateBatch, runAgent } from "./llm";
+import { query } from "@anthropic-ai/claude-agent-sdk";
+import { generateText, generateJSON, generateBatch } from "./llm";
 import { writeArticle } from "./wiki-io";
 import type {
   LinkedInProfile,
@@ -10,9 +11,7 @@ import type {
   MainPageData,
   DidYouKnow,
   ArticleFrontmatter,
-  PageType,
 } from "./types";
-import type { Tool } from "@anthropic-ai/sdk/resources/messages";
 import schema from "../../data/schema.json";
 
 // ---------------------------------------------------------------------------
@@ -53,190 +52,16 @@ export function getStatus(): GenerationStatus {
 }
 
 // ---------------------------------------------------------------------------
-// PHASE 1: Agentic Source Gathering
+// PHASE 1: Research via Claude Agent SDK
 //
-// The LLM agent reads the LinkedIn profile, then uses web_search to research
-// the person, their companies, projects, publications, and anything else
-// worth covering. Each discovery is saved to raw/ as a source file.
-// The agent then plans which articles to create based on ALL gathered sources.
+// Uses the Agent SDK with built-in WebSearch + WebFetch tools.
+// The agent researches the person, their companies, projects, etc.
+// and returns a structured research report.
+//
+// No custom tool loop needed — the SDK handles everything.
 // ---------------------------------------------------------------------------
 
-const RESEARCH_TOOLS: Tool[] = [
-  {
-    name: "web_search",
-    description:
-      "Search the web for information about a person, company, project, publication, or topic. Use this to discover things the LinkedIn profile doesn't mention — acquisitions, publications, conference talks, news mentions, open source contributions, etc.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        query: {
-          type: "string",
-          description: "The search query",
-        },
-      },
-      required: ["query"],
-    },
-  },
-  {
-    name: "save_source",
-    description:
-      "Save a discovered piece of information as a source file. Call this for every meaningful fact or context you find — it will be used when compiling the wiki articles.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        slug: {
-          type: "string",
-          description:
-            "Short identifier for this source, e.g. 'google-acquisition-2024' or 'naman-tensorflow-talk'",
-        },
-        title: {
-          type: "string",
-          description: "Human-readable title for this source",
-        },
-        content: {
-          type: "string",
-          description: "The full text content of this source",
-        },
-        url: {
-          type: "string",
-          description: "URL where this was found (if applicable)",
-        },
-        relevantTo: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Which entities this is relevant to, e.g. ['Google', 'Naman Ambavi', 'TensorFlow']",
-        },
-      },
-      required: ["slug", "title", "content", "relevantTo"],
-    },
-  },
-  {
-    name: "plan_article",
-    description:
-      "Add an article to the encyclopedia plan. Call this for every entity that deserves its own Wikipedia page. Include ALL context you've gathered from the profile AND from web searches.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        slug: {
-          type: "string",
-          description:
-            "Path for this article, e.g. 'companies/google', 'people/naman-ambavi', 'technology/tensorflow'",
-        },
-        title: {
-          type: "string",
-          description: "Article title as it would appear on Wikipedia",
-        },
-        type: {
-          type: "string",
-          enum: [
-            "person",
-            "company",
-            "education",
-            "technology",
-            "place",
-            "career",
-            "event",
-            "project",
-            "publication",
-          ],
-          description: "The type of entity",
-        },
-        dataContext: {
-          type: "string",
-          description:
-            "ALL known information about this entity — from LinkedIn profile AND from web search results. This is the ONLY input the article writer will see, so include everything relevant.",
-        },
-        reasoning: {
-          type: "string",
-          description:
-            "Why this article belongs in the encyclopedia. What makes it interesting or important in this person's story.",
-        },
-        sourceSlugs: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Which source files (from save_source) are relevant to this article",
-        },
-      },
-      required: ["slug", "title", "type", "dataContext", "reasoning"],
-    },
-  },
-  {
-    name: "done_planning",
-    description:
-      "Call this when you have finished researching and planning all articles. Summarize what you found and what the encyclopedia will cover.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        summary: {
-          type: "string",
-          description:
-            "Summary of research findings and the planned encyclopedia structure",
-        },
-        totalArticles: {
-          type: "number",
-          description: "Total number of articles planned",
-        },
-      },
-      required: ["summary", "totalArticles"],
-    },
-  },
-];
-
-async function webSearch(query: string): Promise<string> {
-  // Use a web search API. For hackathon, we use a simple fetch to a search API.
-  // If no search API is configured, fall back to telling the LLM to use its knowledge.
-  const searchApiUrl = process.env.SEARCH_API_URL;
-  const searchApiKey = process.env.SEARCH_API_KEY;
-
-  if (searchApiUrl && searchApiKey) {
-    try {
-      const response = await fetch(
-        `${searchApiUrl}?q=${encodeURIComponent(query)}&count=5`,
-        {
-          headers: { Authorization: `Bearer ${searchApiKey}` },
-        }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        // Normalize search results — adapt to your search API's response format
-        const results = Array.isArray(data.results)
-          ? data.results
-          : Array.isArray(data.web?.results)
-            ? data.web.results
-            : [];
-        return results
-          .slice(0, 5)
-          .map(
-            (r: { title?: string; url?: string; snippet?: string; description?: string }) =>
-              `Title: ${r.title || "N/A"}\nURL: ${r.url || "N/A"}\nSnippet: ${r.snippet || r.description || "N/A"}`
-          )
-          .join("\n\n---\n\n");
-      }
-    } catch {
-      // Fall through to fallback
-    }
-  }
-
-  // Fallback: no search API configured. Tell the LLM to use its training data.
-  return `[No web search API configured. Use your training knowledge about "${query}" to provide relevant information. Note in the article that some information comes from general knowledge rather than verified sources.]`;
-}
-
-interface GatheredSource {
-  slug: string;
-  title: string;
-  content: string;
-  url?: string;
-  relevantTo: string[];
-}
-
-async function gatherSourcesAndPlan(
-  profile: LinkedInProfile
-): Promise<{ plan: EntityPlan[]; sources: GatheredSource[] }> {
-  const sources: GatheredSource[] = [];
-  const plan: EntityPlan[] = [];
-
+async function researchPerson(profile: LinkedInProfile): Promise<string> {
   const profileSummary = `
 Name: ${profile.name}
 Headline: ${profile.headline}
@@ -254,106 +79,133 @@ Skills: ${profile.skills.join(", ")}
 Connections (sample): ${profile.connections.slice(0, 20).map((c) => `${c.name} (${c.headline})`).join(", ")}
   `.trim();
 
-  const systemPrompt = `You are a research agent building a comprehensive personal encyclopedia (like Wikipedia) about a specific person. Your job is to:
+  const researchPrompt = `You are a research agent building a comprehensive personal encyclopedia about ${profile.name}.
 
-1. READ the LinkedIn profile carefully
-2. SEARCH the web to discover additional information the profile doesn't mention — company news, acquisitions, publications, talks, open source projects, industry context, notable colleagues
-3. SAVE every meaningful piece of information as a source file
-4. PLAN the articles that should exist in this encyclopedia
+Here is their LinkedIn profile:
 
-Be thorough. A good encyclopedia about a person should cover not just their career history, but the companies they worked at (their own Wikipedia-style articles), the technologies they use, the places they've lived, their educational institutions, and any notable projects or publications.
+${profileSummary}
 
-For each web search, think about what an encyclopedia editor would want to know:
-- What happened to their previous companies? Any acquisitions, funding rounds, notable products?
-- Did they publish anything? Speak at conferences? Contribute to open source?
-- What's notable about their educational institutions?
-- What are the key developments in their technology areas?
+Your task:
+1. Search the web for this person — find news mentions, publications, talks, open source projects, interviews
+2. Search for each company they worked at — find funding rounds, acquisitions, notable products, key people
+3. Search for their educational institutions — notable programs, rankings, famous alumni
+4. Fetch any particularly relevant pages for detailed information
 
-Search at least 5-8 times to build a rich picture. Don't just search for the person's name — search for their companies, their projects, their field.
+After your research, produce a STRUCTURED REPORT with this exact format:
 
-When you've gathered enough sources, plan ALL the articles. Each article should have a rich dataContext that includes information from BOTH the LinkedIn profile AND your web research. The dataContext is the ONLY input the article writer will see.
+## Research Findings
 
-Call done_planning when you're finished.`;
+### About ${profile.name}
+(Everything you found about the person beyond what's in their LinkedIn)
 
-  const userPrompt = `Here is the LinkedIn profile to research and build an encyclopedia for:\n\n${profileSummary}`;
+### Companies
+For each company:
+#### [Company Name]
+- What the company does
+- Key facts (founding, funding, acquisition, size)
+- The person's role and contributions
+- Notable colleagues
 
-  const handleTool = async (
-    toolName: string,
-    input: Record<string, unknown>
-  ): Promise<string> => {
-    switch (toolName) {
-      case "web_search": {
-        const query = input.query as string;
-        status.currentArticle = `Researching: ${query}`;
-        const results = await webSearch(query);
+### Education
+For each school:
+#### [School Name]
+- Key facts about the institution
+- Relevant programs
+- The person's degree and time there
 
-        // Save search results to raw/
-        const searchSlug = slugify(query).slice(0, 50);
-        const searchDir = path.join(RAW_DIR, "web");
-        await fs.mkdir(searchDir, { recursive: true });
-        await fs.writeFile(
-          path.join(searchDir, `search-${searchSlug}.json`),
-          JSON.stringify({ query, results, timestamp: new Date().toISOString() }, null, 2),
-          "utf-8"
-        );
+### Technologies & Skills
+For each major skill/technology:
+#### [Technology Name]
+- Brief description
+- How the person uses it
+- Notable projects involving this technology
 
-        return results;
-      }
+### Notable Discoveries
+(Anything interesting you found that doesn't fit above — events, publications, projects, awards, life events)
 
-      case "save_source": {
-        const source: GatheredSource = {
-          slug: input.slug as string,
-          title: input.title as string,
-          content: input.content as string,
-          url: input.url as string | undefined,
-          relevantTo: input.relevantTo as string[],
-        };
-        sources.push(source);
+### Suggested Articles
+List every entity that deserves its own Wikipedia article, formatted as:
+- SLUG: people/${profile.name.toLowerCase().replace(/\s+/g, "-")} | TITLE: ${profile.name} | TYPE: person
+- SLUG: companies/[name] | TITLE: [Name] | TYPE: company
+(etc. for all entities)
 
-        // Persist to raw/
-        const sourceDir = path.join(RAW_DIR, "sources");
-        await fs.mkdir(sourceDir, { recursive: true });
-        await fs.writeFile(
-          path.join(sourceDir, `${slugify(source.slug)}.json`),
-          JSON.stringify(source, null, 2),
-          "utf-8"
-        );
+Be thorough. Search at least 5-8 times. The quality of the encyclopedia depends entirely on how much you discover here.`;
 
-        return `Source saved: ${source.title} (relevant to: ${source.relevantTo.join(", ")})`;
-      }
+  let researchReport = "";
 
-      case "plan_article": {
-        const entity: EntityPlan = {
-          slug: input.slug as string,
-          title: input.title as string,
-          type: input.type as PageType,
-          dataContext: input.dataContext as string,
-        };
-        plan.push(entity);
-        status.currentArticle = `Planned: ${entity.title}`;
-        return `Article planned: ${entity.title} (${entity.type}) at ${entity.slug}`;
-      }
-
-      case "done_planning": {
-        return `Planning complete. ${plan.length} articles planned.`;
-      }
-
-      default:
-        return `Unknown tool: ${toolName}`;
+  for await (const message of query({
+    prompt: researchPrompt,
+    options: {
+      allowedTools: ["WebSearch", "WebFetch"],
+      maxTurns: 25,
+    },
+  })) {
+    // Collect the final result
+    if ("result" in message && typeof message.result === "string") {
+      researchReport = message.result;
     }
-  };
-
-  await runAgent(systemPrompt, userPrompt, RESEARCH_TOOLS, handleTool, 30);
-
-  // If agent didn't plan anything (error or confused), fall back to basic plan
-  if (plan.length === 0) {
-    return { plan: fallbackPlan(profile), sources };
   }
 
-  return { plan, sources };
+  // Save the raw research to disk
+  const researchDir = path.join(RAW_DIR, "research");
+  await fs.mkdir(researchDir, { recursive: true });
+  await fs.writeFile(
+    path.join(researchDir, `${slugify(profile.name)}-research.md`),
+    researchReport,
+    "utf-8"
+  );
+
+  return researchReport;
 }
 
-// Fallback if the agent fails — basic mechanical extraction
+// ---------------------------------------------------------------------------
+// PHASE 1.5: Parse research into entity plan
+// ---------------------------------------------------------------------------
+
+async function planFromResearch(
+  profile: LinkedInProfile,
+  research: string
+): Promise<EntityPlan[]> {
+  const planPrompt = `Based on this research about ${profile.name}, create a detailed article plan for their personal encyclopedia.
+
+## Research Report
+${research}
+
+## LinkedIn Profile (source of truth for career facts)
+Name: ${profile.name}
+Positions: ${profile.positions.map((p) => `${p.title} at ${p.company}`).join(", ")}
+Education: ${profile.education.map((e) => `${e.degree} from ${e.school}`).join(", ")}
+Skills: ${profile.skills.slice(0, 15).join(", ")}
+Location: ${profile.location}
+
+## Instructions
+Return a JSON array of article plans. Each entry:
+{
+  "slug": "category/article-name" (e.g. "companies/google", "people/naman-ambavi"),
+  "title": "Article Title",
+  "type": "person|company|education|technology|place|career|event|project|publication",
+  "dataContext": "ALL relevant information for writing this article — combine LinkedIn data AND research findings. This is the ONLY input the article writer sees, so include everything."
+}
+
+Rules:
+- Always include: 1 main person article, 1 per company, 1 per school, top 10 skills, location, career timeline
+- Also include any events, projects, publications, or notable entities discovered in research
+- The dataContext must be RICH — include specific facts, dates, numbers from the research
+- 30-60 articles total for a thorough encyclopedia`;
+
+  const plan = await generateJSON<EntityPlan[]>(planPrompt);
+
+  if (!Array.isArray(plan) || plan.length === 0) {
+    return fallbackPlan(profile);
+  }
+
+  return plan;
+}
+
+// ---------------------------------------------------------------------------
+// Fallback if the agent or planning fails
+// ---------------------------------------------------------------------------
+
 function fallbackPlan(profile: LinkedInProfile): EntityPlan[] {
   const entities: EntityPlan[] = [];
   const seen = new Set<string>();
@@ -383,7 +235,11 @@ function fallbackPlan(profile: LinkedInProfile): EntityPlan[] {
         slug,
         title: pos.company,
         type: "company",
-        dataContext: JSON.stringify({ company: pos.company, role: pos.title, dates: `${pos.startDate} - ${pos.endDate || "present"}` }),
+        dataContext: JSON.stringify({
+          company: pos.company,
+          role: pos.title,
+          dates: `${pos.startDate} - ${pos.endDate || "present"}`,
+        }),
       });
     }
   }
@@ -396,7 +252,11 @@ function fallbackPlan(profile: LinkedInProfile): EntityPlan[] {
         slug,
         title: edu.school,
         type: "education",
-        dataContext: JSON.stringify({ school: edu.school, degree: edu.degree, field: edu.field }),
+        dataContext: JSON.stringify({
+          school: edu.school,
+          degree: edu.degree,
+          field: edu.field,
+        }),
       });
     }
   }
@@ -405,14 +265,24 @@ function fallbackPlan(profile: LinkedInProfile): EntityPlan[] {
     const slug = `technology/${slugify(skill)}`;
     if (!seen.has(slug)) {
       seen.add(slug);
-      entities.push({ slug, title: skill, type: "technology", dataContext: JSON.stringify({ skill }) });
+      entities.push({
+        slug,
+        title: skill,
+        type: "technology",
+        dataContext: JSON.stringify({ skill }),
+      });
     }
   }
 
   if (profile.location) {
     const slug = `places/${slugify(profile.location)}`;
     if (!seen.has(slug)) {
-      entities.push({ slug, title: profile.location, type: "place", dataContext: JSON.stringify({ location: profile.location }) });
+      entities.push({
+        slug,
+        title: profile.location,
+        type: "place",
+        dataContext: JSON.stringify({ location: profile.location }),
+      });
     }
   }
 
@@ -420,14 +290,17 @@ function fallbackPlan(profile: LinkedInProfile): EntityPlan[] {
     slug: "career/timeline",
     title: `${profile.name} — Career Timeline`,
     type: "career",
-    dataContext: JSON.stringify({ positions: profile.positions, education: profile.education }),
+    dataContext: JSON.stringify({
+      positions: profile.positions,
+      education: profile.education,
+    }),
   });
 
   return entities;
 }
 
 // ---------------------------------------------------------------------------
-// PHASE 2: Compilation — LLM reads all sources and generates articles
+// PHASE 2: Compilation — generate articles from research
 // ---------------------------------------------------------------------------
 
 const pageTypes = schema.page_types as Record<
@@ -444,7 +317,6 @@ export function buildArticlePrompt(
   const sections = typeSchema?.sections ?? [];
   const infoboxFields = typeSchema?.infobox_fields ?? [];
 
-  // List all other articles for cross-linking
   const otherArticles = allEntities
     .filter((e) => e.slug !== entity.slug)
     .map((e) => `[[${e.title}]]`)
@@ -452,7 +324,7 @@ export function buildArticlePrompt(
 
   return `You are writing a Wikipedia-style encyclopedia article about "${entity.title}" (type: ${entity.type}).
 
-## Research context (from web search and LinkedIn profile)
+## Research context
 ${entity.dataContext}
 
 ## Other articles in this encyclopedia (use [[wikilinks]] to cross-reference)
@@ -462,10 +334,10 @@ ${otherArticles}
 1. Write in a neutral, encyclopedic Wikipedia tone.
 2. Begin with a bold opening sentence: **${entity.title}** is...
 3. Include these sections (use ## headings): ${sections.join(", ")}
-4. Use [[wikilinks]] liberally to cross-reference other articles in this encyclopedia.
-5. Use [1], [2], etc. footnote citations. Cite the actual sources from the research context.
-6. Article length: 200-500 words of body content.
-7. Ground the article in the RESEARCH CONTEXT above. Do not invent facts that aren't supported by the context.
+4. Use [[wikilinks]] liberally to cross-reference other articles.
+5. Use [1], [2] footnote citations. Cite actual sources from the research context.
+6. Article length: 200-500 words.
+7. Ground the article in the RESEARCH CONTEXT above. Do not invent unsupported facts.
 
 ## Output format
 Return Markdown with YAML frontmatter:
@@ -531,7 +403,7 @@ export function parseGeneratedArticle(
 }
 
 // ---------------------------------------------------------------------------
-// Main Page + Index generation (unchanged)
+// Main Page + Index generation
 // ---------------------------------------------------------------------------
 
 export async function generateMainPageData(
@@ -541,7 +413,7 @@ export async function generateMainPageData(
   const firstName = profile.name.split(" ")[0];
   const encyclopediaName = `${firstName}opedia`;
 
-  const factsPrompt = `Based on this person's profile and the planned encyclopedia articles, generate 5 interesting "Did you know..." facts.
+  const factsPrompt = `Based on this person's profile and encyclopedia articles, generate 5 interesting "Did you know..." facts.
 
 Person: ${profile.name}
 Headline: ${profile.headline}
@@ -556,7 +428,8 @@ Make facts specific, surprising, and use [[wikilinks]].`;
 
   const didYouKnow = await generateJSON<DidYouKnow[]>(factsPrompt);
 
-  const featuredSlug = plan.find((e) => e.type === "person")?.slug ?? plan[0].slug;
+  const featuredSlug =
+    plan.find((e) => e.type === "person")?.slug ?? plan[0].slug;
   const featuredSummary = await generateText(
     `Write a 2-3 sentence encyclopedia summary of ${profile.name}. ${profile.headline}. ${profile.summary?.slice(0, 300) || ""}`
   );
@@ -564,14 +437,23 @@ Make facts specific, surprising, and use [[wikilinks]].`;
   const portalCounts: Record<string, { count: number; slug: string }> = {};
   for (const e of plan) {
     const name =
-      e.type === "person" ? "People" :
-      e.type === "company" ? "Companies" :
-      e.type === "education" ? "Education" :
-      e.type === "technology" ? "Technology" :
-      e.type === "place" ? "Places" :
-      e.type === "event" ? "Events" :
-      e.type === "project" ? "Projects" :
-      e.type === "publication" ? "Publications" : "Career";
+      e.type === "person"
+        ? "People"
+        : e.type === "company"
+          ? "Companies"
+          : e.type === "education"
+            ? "Education"
+            : e.type === "technology"
+              ? "Technology"
+              : e.type === "place"
+                ? "Places"
+                : e.type === "event"
+                  ? "Events"
+                  : e.type === "project"
+                    ? "Projects"
+                    : e.type === "publication"
+                      ? "Publications"
+                      : "Career";
     if (!portalCounts[name]) portalCounts[name] = { count: 0, slug: e.slug };
     portalCounts[name].count++;
   }
@@ -585,7 +467,11 @@ Make facts specific, surprising, and use [[wikilinks]].`;
     featuredArticleSummary: featuredSummary,
     featuredArticleSlug: featuredSlug,
     didYouKnow: Array.isArray(didYouKnow) ? didYouKnow : [],
-    portals: Object.entries(portalCounts).map(([name, { count, slug }]) => ({ name, count, slug })),
+    portals: Object.entries(portalCounts).map(([name, { count, slug }]) => ({
+      name,
+      count,
+      slug,
+    })),
     recentPeople: (profile.connections || []).slice(0, 5).map((c) => ({
       name: c.name,
       description: c.headline,
@@ -625,7 +511,12 @@ ${lines.join("\n")}
 }
 
 // ---------------------------------------------------------------------------
-// MAIN PIPELINE: Two-phase Karpathy-aligned generation
+// MAIN PIPELINE
+//
+// Phase 1: Agent SDK researches the person (WebSearch + WebFetch)
+// Phase 1.5: LLM plans articles from research findings
+// Phase 2: Batch-generate all articles from the plan
+// Phase 3: Generate main page + index
 // ---------------------------------------------------------------------------
 
 export async function generateEncyclopedia(
@@ -633,30 +524,36 @@ export async function generateEncyclopedia(
 ): Promise<void> {
   try {
     // ================================================================
-    // PHASE 1: Agentic source gathering + article planning
-    // The LLM agent researches the person, searches the web,
-    // saves sources, and plans which articles to create.
+    // PHASE 1: Research via Claude Agent SDK
+    // The agent autonomously searches the web, fetches pages, and
+    // compiles a research report about the person.
     // ================================================================
     status = {
       phase: "fetching",
       totalArticles: 0,
       completedArticles: 0,
-      currentArticle: "Researching — the agent is searching the web and planning articles...",
+      currentArticle:
+        "Researching — the agent is searching the web for information...",
     };
 
-    const { plan, sources } = await gatherSourcesAndPlan(profile);
+    const research = await researchPerson(profile);
 
     // ================================================================
-    // PHASE 2: Compilation — generate articles from gathered sources
-    // Each article is written with the full research context, not
-    // just the LinkedIn profile data.
+    // PHASE 1.5: Plan articles from research
+    // LLM reads the research report + LinkedIn profile and plans
+    // which articles to create, with rich context for each.
     // ================================================================
-    status = {
-      phase: "generating",
-      totalArticles: plan.length,
-      completedArticles: 0,
-      currentArticle: "",
-    };
+    status.phase = "planning";
+    status.currentArticle = "Planning articles from research findings...";
+
+    const plan = await planFromResearch(profile, research);
+    status.totalArticles = plan.length;
+
+    // ================================================================
+    // PHASE 2: Generate articles
+    // Each article is written with the full research context.
+    // ================================================================
+    status.phase = "generating";
 
     const systemPrompt =
       "You are a Wikipedia article writer. Write in a neutral, encyclopedic tone. Return raw Markdown with YAML frontmatter — no code fences. Ground every claim in the research context provided.";
@@ -684,7 +581,7 @@ export async function generateEncyclopedia(
     }
 
     // ================================================================
-    // PHASE 3: Finalize — main page data + index
+    // PHASE 3: Finalize
     // ================================================================
     status.phase = "finalizing";
     status.currentArticle = "Main page & index";

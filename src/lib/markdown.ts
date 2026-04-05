@@ -24,8 +24,12 @@ function resolveWikilinks(markdown: string, existingSlugs: string[], personSlug?
     slugByEnding.set(lastSegment, s);
   }
 
-  return markdown.replace(/\[\[(.+?)\]\]/g, (_, title: string) => {
-    const titleSlug = slugify(title);
+  return markdown.replace(/\[\[(.+?)\]\]/g, (_, raw: string) => {
+    // Handle pipe syntax: [[target|display text]]
+    const parts = raw.split("|");
+    const target = parts[0].trim();
+    const displayText = parts.length > 1 ? parts[parts.length - 1].trim() : target;
+    const titleSlug = slugify(target);
 
     // Try exact ending match first
     let matchedSlug = existingSlugs.find((s) => s.endsWith(`/${titleSlug}`));
@@ -58,9 +62,9 @@ function resolveWikilinks(markdown: string, existingSlugs: string[], personSlug?
     }
 
     if (matchedSlug) {
-      return `<a href="${prefix}/${matchedSlug}" class="wikilink">${title}</a>`;
+      return `<a href="${prefix}/${matchedSlug}" class="wikilink">${displayText}</a>`;
     }
-    return `<a href="${prefix}/${titleSlug}" class="wikilink-new" title="${title} (page does not exist)">${title}</a>`;
+    return `<a href="${prefix}/${titleSlug}" class="wikilink-new" title="${target} (page does not exist)">${displayText}</a>`;
   });
 }
 

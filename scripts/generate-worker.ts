@@ -93,7 +93,9 @@ async function updateStatus(status: GenerationStatus): Promise<void> {
 
 async function researchWithTimeout(prompt: string, timeoutMs = 180000): Promise<string> {
   let researchReport = "";
-  let lastAssistantText = "";
+  // Keep the LONGEST text block seen — the final assistant message before
+  // result typically contains the complete research report
+  let longestAssistantText = "";
 
   const researchPromise = (async () => {
     for await (const message of query({
@@ -102,30 +104,41 @@ async function researchWithTimeout(prompt: string, timeoutMs = 180000): Promise<
     })) {
       const msg = message as Record<string, unknown>;
 
-      // Capture the final result
+      // Capture the final result (best case — clean termination)
       if (msg.type === "result" && typeof msg.result === "string") {
         researchReport = msg.result;
         return researchReport;
       }
 
-      // Also capture assistant messages (the research text accumulates here)
+      // Capture text from every assistant message. The research report
+      // accumulates across turns — keep the longest text block as it's
+      // most likely the final compiled report.
       if (msg.type === "assistant" && msg.message) {
         const assistantMsg = msg.message as Record<string, unknown>;
         if (Array.isArray(assistantMsg.content)) {
           for (const block of assistantMsg.content) {
-            if ((block as Record<string, unknown>).type === "text") {
-              lastAssistantText = (block as Record<string, unknown>).text as string;
-              logEntry(`Research in progress (${lastAssistantText.length} chars)...`, "research");
+            const b = block as Record<string, unknown>;
+            if (b.type === "text" && typeof b.text === "string") {
+              if (b.text.length > longestAssistantText.length) {
+                longestAssistantText = b.text;
+              }
+              logEntry(
+                `Research in progress (${b.text.length} chars collected)...`,
+                "research"
+              );
               void updateStatus({
-                phase: "fetching", totalArticles: 0, completedArticles: 0,
-                currentArticle: "Researching via web search...",
+                phase: "fetching",
+                totalArticles: 0,
+                completedArticles: 0,
+                currentArticle: `Researching... ${b.text.length} chars collected`,
               });
             }
           }
         }
       }
     }
-    return researchReport || lastAssistantText;
+    // Loop ended without result message — use longest assistant text
+    return researchReport || longestAssistantText;
   })();
 
   const timeoutPromise = new Promise<string>((_, reject) =>
@@ -135,10 +148,13 @@ async function researchWithTimeout(prompt: string, timeoutMs = 180000): Promise<
   try {
     return await Promise.race([researchPromise, timeoutPromise]);
   } catch {
-    // Timeout hit — use whatever was collected (result OR last assistant text)
-    const collected = researchReport || lastAssistantText;
+    // Timeout hit — use whatever was collected
+    const collected = researchReport || longestAssistantText;
     if (collected.length > 0) {
-      logEntry(`Research timed out but collected ${collected.length} chars. Using partial results.`, "info");
+      logEntry(
+        `Research timed out but collected ${collected.length} chars. Proceeding with partial results.`,
+        "info"
+      );
       return collected;
     }
     throw new Error("Research timed out with no results");

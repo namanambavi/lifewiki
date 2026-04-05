@@ -657,6 +657,10 @@ body {
    ========================================================= */
 
 @media (max-width: 768px) {
+  .wiki-header {
+    flex-wrap: wrap;
+  }
+
   .wiki-body {
     flex-direction: column;
     padding: 12px;

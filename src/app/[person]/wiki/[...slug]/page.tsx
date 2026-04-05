@@ -1,4 +1,4 @@
-import { readArticle, getAllSlugs, getWikiDir } from "@/lib/wiki-io";
+import { readArticle, getAllSlugs, getWikiDir, listArticles } from "@/lib/wiki-io";
 import { renderMarkdown } from "@/lib/markdown";
 import ArticlePage from "@/components/ArticlePage";
 import { notFound } from "next/navigation";
@@ -16,7 +16,12 @@ export default async function WikiArticle({ params }: Props) {
     const article = await readArticle(slugPath, wikiDir);
     const allSlugs = await getAllSlugs(wikiDir);
     article.html = await renderMarkdown(article.content, allSlugs, person);
-    return <ArticlePage article={article} personSlug={person} />;
+
+    // Get all articles for sidebar navigation
+    let allArticles: Awaited<ReturnType<typeof listArticles>> = [];
+    try { allArticles = await listArticles(wikiDir); } catch { /* empty */ }
+
+    return <ArticlePage article={article} personSlug={person} allArticles={allArticles} />;
   } catch {
     notFound();
   }

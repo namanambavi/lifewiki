@@ -82,8 +82,18 @@ Example:
   {"slug": "companies/oximy", "title": "Oximy", "type": "company"}
 ]
 
-Include: the person, every company mentioned, every school, top skills, locations, career timeline.
-15-30 entries. Just the slug, title, type. Nothing else.`;
+Include ALL of these:
+- The person (people/slug)
+- Every company mentioned — employers, investors, partners, competitors (companies/slug)
+- Every school (education/slug)
+- Every technology, skill, framework, product mentioned (technology/slug)
+- Every city or country mentioned (places/slug)
+- Every notable event, award, program (career/slug)
+- Every notable person mentioned — co-founders, investors, colleagues (people/slug)
+- Any industry concepts worth explaining (technology/slug)
+
+Be expansive. If an entity is mentioned in the research, it gets an article.
+40-80 entries. Just the slug, title, type. Nothing else.`;
 
   type SlimPlan = { slug: string; title: string; type: string }[];
   const slimPlan = await generateJSON<SlimPlan>(planPrompt);

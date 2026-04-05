@@ -1,0 +1,710 @@
+/* =========================================================
+   Wikipedia Vector Skin Clone
+   Consolidated from homepage-v2.html and wikipedia-mockup.html
+   ========================================================= */
+
+/* --- Reset & Base Typography --- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Linux Libertine', Georgia, 'Times New Roman', serif;
+  background: #f8f9fa;
+  color: #202122;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* =========================================================
+   Site Header (.wiki-header / .site-header)
+   ========================================================= */
+
+/* Article page header */
+.wiki-header {
+  background: #fff;
+  border-bottom: 1px solid #a7d7f9;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Main page header (alias) */
+.site-header {
+  background: #fff;
+  border-bottom: 1px solid #a7d7f9;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: sans-serif;
+}
+
+/* =========================================================
+   Logo
+   ========================================================= */
+
+.wiki-logo {
+  font-size: 20px;
+  font-weight: bold;
+  color: #202122;
+}
+
+.wiki-logo span {
+  color: #36c;
+}
+
+.site-logo {
+  font-family: 'Linux Libertine', Georgia, serif;
+  font-size: 20px;
+}
+
+.site-logo b {
+  font-weight: normal;
+}
+
+/* =========================================================
+   Search
+   ========================================================= */
+
+.wiki-search {
+  flex: 1;
+  max-width: 400px;
+}
+
+.wiki-search input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #a2a9b1;
+  border-radius: 2px;
+  font-size: 13px;
+  font-family: sans-serif;
+}
+
+.site-search {
+  display: flex;
+  gap: 4px;
+}
+
+.site-search input {
+  padding: 4px 8px;
+  border: 1px solid #a2a9b1;
+  font-size: 13px;
+  width: 240px;
+  font-family: sans-serif;
+}
+
+.site-search button {
+  padding: 4px 10px;
+  background: #f8f9fa;
+  border: 1px solid #a2a9b1;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: sans-serif;
+}
+
+/* =========================================================
+   Tab Bar / Navigation (.wiki-nav / .wiki-tabs / .tabs)
+   ========================================================= */
+
+.wiki-nav {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  font-family: sans-serif;
+  color: #54595d;
+  padding: 0 16px;
+  background: #fff;
+  border-bottom: 1px solid #eaecf0;
+}
+
+.wiki-nav a {
+  padding: 8px 0;
+  text-decoration: none;
+  color: #54595d;
+  border-bottom: 2px solid transparent;
+}
+
+.wiki-nav a.active {
+  color: #202122;
+  border-bottom-color: #36c;
+  font-weight: 600;
+}
+
+/* Main page tab bar */
+.wiki-tabs,
+.tabs {
+  display: flex;
+  gap: 0;
+  font-family: sans-serif;
+  font-size: 12px;
+  background: #fff;
+  border-bottom: 1px solid #a2a9b1;
+  padding: 0 12px;
+}
+
+.wiki-tabs a,
+.tabs a {
+  padding: 6px 12px;
+  text-decoration: none;
+  color: #36c;
+}
+
+.wiki-tabs a.active,
+.tabs a.active {
+  background: #f8f9fa;
+  border: 1px solid #a2a9b1;
+  border-bottom: 1px solid #f8f9fa;
+  margin-bottom: -1px;
+  color: #202122;
+  font-weight: bold;
+}
+
+/* =========================================================
+   Page Layout
+   ========================================================= */
+
+/* Article page body — flex layout */
+.wiki-body {
+  display: flex;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  gap: 20px;
+}
+
+.wiki-content {
+  flex: 1;
+}
+
+.wiki-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+}
+
+/* Main page content container */
+.content,
+.main-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 12px;
+}
+
+/* =========================================================
+   Article Title
+   ========================================================= */
+
+.wiki-title {
+  font-size: 28px;
+  font-weight: normal;
+  border-bottom: 1px solid #a2a9b1;
+  padding-bottom: 4px;
+  margin-bottom: 12px;
+}
+
+/* Main page title */
+.page-title {
+  font-size: 24px;
+  font-weight: normal;
+  border-bottom: 1px solid #a2a9b1;
+  padding-bottom: 2px;
+  margin-bottom: 12px;
+}
+
+/* =========================================================
+   Article Content Typography
+   ========================================================= */
+
+.wiki-content p {
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.wiki-content h2 {
+  font-size: 20px;
+  font-weight: normal;
+  border-bottom: 1px solid #a2a9b1;
+  padding-bottom: 2px;
+  margin: 20px 0 10px;
+}
+
+.wiki-content h3 {
+  font-size: 16px;
+  margin: 14px 0 6px;
+}
+
+.wiki-content a {
+  color: #36c;
+  text-decoration: none;
+}
+
+.wiki-content a:hover {
+  text-decoration: underline;
+}
+
+/* Red links — pages that don't exist yet */
+.wikilink-new,
+.wiki-content a.new,
+.section-body a.new {
+  color: #ba0000;
+}
+
+/* =========================================================
+   Infobox
+   ========================================================= */
+
+.infobox {
+  background: #f8f9fa;
+  border: 1px solid #a2a9b1;
+  width: 260px;
+  float: right;
+  margin: 0 0 16px 20px;
+  font-size: 13px;
+  font-family: sans-serif;
+}
+
+.infobox-header {
+  background: #b8d4e3;
+  padding: 8px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.infobox-image {
+  background: #e8e8e8;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #72777d;
+  font-size: 12px;
+  font-family: sans-serif;
+}
+
+.infobox table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.infobox th {
+  background: #e8e8e8;
+  padding: 4px 8px;
+  text-align: left;
+  font-weight: 600;
+  vertical-align: top;
+  width: 90px;
+  border: 1px solid #a2a9b1;
+  font-size: 12px;
+}
+
+.infobox td {
+  padding: 4px 8px;
+  border: 1px solid #a2a9b1;
+  font-size: 12px;
+}
+
+/* =========================================================
+   Table of Contents
+   ========================================================= */
+
+.toc {
+  background: #f8f9fa;
+  border: 1px solid #a2a9b1;
+  padding: 10px 14px;
+  display: inline-block;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-family: sans-serif;
+}
+
+.toc-title {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.toc ol {
+  padding-left: 20px;
+}
+
+.toc li {
+  margin: 2px 0;
+}
+
+.toc a {
+  color: #36c;
+  text-decoration: none;
+}
+
+.toc a:hover {
+  text-decoration: underline;
+}
+
+/* =========================================================
+   Categories
+   ========================================================= */
+
+.categories {
+  background: #f8f9fa;
+  border: 1px solid #a2a9b1;
+  padding: 8px 12px;
+  margin-top: 24px;
+  font-size: 12px;
+  font-family: sans-serif;
+}
+
+.categories span {
+  font-weight: bold;
+}
+
+.categories a {
+  color: #36c;
+  text-decoration: none;
+}
+
+.categories a:hover {
+  text-decoration: underline;
+}
+
+/* =========================================================
+   Sidebar Boxes
+   ========================================================= */
+
+.sidebar-box {
+  background: #fff;
+  border: 1px solid #a2a9b1;
+  margin-bottom: 16px;
+  font-family: sans-serif;
+  font-size: 13px;
+}
+
+.sidebar-box-header {
+  background: #e8e8e8;
+  padding: 6px 10px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.sidebar-box-content {
+  padding: 8px 10px;
+}
+
+.sidebar-box-content a {
+  color: #36c;
+  text-decoration: none;
+  display: block;
+  padding: 3px 0;
+}
+
+.sidebar-box-content a:hover {
+  text-decoration: underline;
+}
+
+/* =========================================================
+   Main Page — Welcome Block
+   ========================================================= */
+
+.welcome-block {
+  text-align: center;
+  margin-bottom: 16px;
+  padding: 8px;
+}
+
+.welcome-block h2 {
+  font-size: 16px;
+  font-weight: normal;
+}
+
+.welcome-sub,
+.welcome-block p {
+  font-size: 13px;
+  color: #54595d;
+  font-family: sans-serif;
+}
+
+.welcome-block a {
+  color: #36c;
+  text-decoration: none;
+}
+
+.welcome-block a:hover {
+  text-decoration: underline;
+}
+
+/* =========================================================
+   Main Page — Stats Bar
+   ========================================================= */
+
+.stats-bar {
+  text-align: center;
+  font-size: 12px;
+  color: #54595d;
+  font-family: sans-serif;
+  margin: 10px 0 16px;
+}
+
+.stats-bar b {
+  color: #202122;
+}
+
+/* =========================================================
+   Main Page — Portal Bar
+   ========================================================= */
+
+.portal-bar {
+  background: #fff;
+  border: 1px solid #a2a9b1;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  font-family: sans-serif;
+  font-size: 12px;
+  text-align: center;
+}
+
+.portal-bar a {
+  color: #36c;
+  text-decoration: none;
+  margin: 0 8px;
+}
+
+.portal-bar a:hover {
+  text-decoration: underline;
+}
+
+.portal-bar b {
+  color: #202122;
+}
+
+/* =========================================================
+   Enrich Box
+   ========================================================= */
+
+.enrich-box {
+  background: #eaf3ff;
+  border: 1px solid #a7d7f9;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-family: sans-serif;
+  margin-bottom: 10px;
+}
+
+.enrich-box a {
+  color: #36c;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.enrich-box a:hover {
+  text-decoration: underline;
+}
+
+/* =========================================================
+   Two-Column Grid
+   ========================================================= */
+
+.grid-2col {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.grid-2col > div {
+  flex: 1;
+}
+
+/* =========================================================
+   Section Boxes (Featured, DYK, News, OTD, etc.)
+   ========================================================= */
+
+.section-box {
+  border: 1px solid #a2a9b1;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.section-header {
+  padding: 3px 8px;
+  font-size: 13px;
+  font-weight: bold;
+  font-family: sans-serif;
+  color: #202122;
+}
+
+/* Color variants */
+.section-header.feat {
+  background: #cee0f2;
+  border-bottom: 1px solid #a2a9b1;
+}
+
+.section-header.dyk {
+  background: #cee0c2;
+  border-bottom: 1px solid #a2a9b1;
+}
+
+.section-header.itl {
+  background: #e1d5e7;
+  border-bottom: 1px solid #a2a9b1;
+}
+
+.section-header.otd {
+  background: #f2e2c2;
+  border-bottom: 1px solid #a2a9b1;
+}
+
+.section-header.news {
+  background: #d5e5f5;
+  border-bottom: 1px solid #a2a9b1;
+}
+
+/* Section Body */
+.section-body {
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.section-body ul {
+  list-style: disc;
+  padding-left: 20px;
+  margin: 4px 0;
+}
+
+.section-body li {
+  margin: 3px 0;
+}
+
+.section-body a {
+  color: #36c;
+  text-decoration: none;
+}
+
+.section-body a:hover {
+  text-decoration: underline;
+}
+
+.section-body .more {
+  font-size: 12px;
+  text-align: right;
+  margin-top: 4px;
+}
+
+.section-body .more a {
+  color: #36c;
+}
+
+/* Featured article flex layout */
+.featured-flex {
+  display: flex;
+  gap: 10px;
+}
+
+.featured-img {
+  width: 100px;
+  height: 120px;
+  background: #e8e8e8;
+  border: 1px solid #ccc;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #72777d;
+  font-family: sans-serif;
+}
+
+/* =========================================================
+   URL Input Bar (top of article mockup)
+   ========================================================= */
+
+.url-bar {
+  background: #eaf3ff;
+  border-bottom: 1px solid #a7d7f9;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: sans-serif;
+  font-size: 13px;
+}
+
+.url-bar input {
+  flex: 1;
+  max-width: 500px;
+  padding: 8px 12px;
+  border: 2px solid #36c;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.url-bar button {
+  background: #36c;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* =========================================================
+   Responsive — Mobile
+   ========================================================= */
+
+@media (max-width: 768px) {
+  .wiki-body {
+    flex-direction: column;
+    padding: 12px;
+  }
+
+  .wiki-sidebar {
+    width: 100%;
+  }
+
+  .infobox {
+    float: none;
+    width: 100%;
+    margin: 0 0 16px 0;
+  }
+
+  .wiki-search {
+    max-width: 100%;
+  }
+
+  .wiki-search input {
+    width: 100%;
+  }
+
+  .site-search input {
+    width: 160px;
+  }
+
+  .grid-2col {
+    flex-direction: column;
+  }
+
+  .main-page,
+  .content {
+    padding: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .grid-2col {
+    flex-direction: column;
+  }
+
+  .featured-flex {
+    flex-direction: column;
+  }
+
+  .featured-img {
+    width: 100%;
+    height: 80px;
+  }
+}

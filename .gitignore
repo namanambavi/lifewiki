@@ -42,4 +42,5 @@ next-env.d.ts
 data/raw/
 data/wiki/
 data/users/
+data/generation-status.json
 .gstack/

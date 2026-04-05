@@ -1,4 +1,4 @@
-export type PageType = "person" | "company" | "education" | "technology" | "place" | "career";
+export type PageType = "person" | "company" | "education" | "technology" | "place" | "career" | "event" | "project" | "publication";
 
 export interface Infobox {
   [key: string]: string | string[];

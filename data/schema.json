@@ -23,6 +23,18 @@
     "career": {
       "sections": ["Overview", "Timeline", "Key transitions"],
       "infobox_fields": ["total_years", "companies", "current_role"]
+    },
+    "event": {
+      "sections": ["Overview", "Speakers and participants", "Impact"],
+      "infobox_fields": ["date", "location", "organizer", "type"]
+    },
+    "project": {
+      "sections": ["Overview", "Contributors", "Technology", "Impact"],
+      "infobox_fields": ["status", "language", "license", "repository"]
+    },
+    "publication": {
+      "sections": ["Summary", "Key findings", "Authors", "Reception"],
+      "infobox_fields": ["authors", "published", "venue", "citations"]
     }
   },
   "naming": "lowercase-hyphenated",

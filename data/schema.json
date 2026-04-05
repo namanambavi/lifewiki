@@ -1,0 +1,31 @@
+{
+  "page_types": {
+    "person": {
+      "sections": ["Early life and education", "Career", "Skills and expertise", "Notable connections"],
+      "infobox_fields": ["born", "education", "occupation", "employer", "known_for", "skills"]
+    },
+    "company": {
+      "sections": ["History", "Products and services", "Key people", "Related entities"],
+      "infobox_fields": ["industry", "founded", "headquarters", "key_people"]
+    },
+    "education": {
+      "sections": ["Overview", "Notable programs", "Notable alumni"],
+      "infobox_fields": ["type", "location", "founded", "notable_programs"]
+    },
+    "technology": {
+      "sections": ["Overview", "Usage", "Related technologies"],
+      "infobox_fields": ["paradigm", "first_appeared", "used_by"]
+    },
+    "place": {
+      "sections": ["Overview", "Economy", "Notable companies", "Notable people"],
+      "infobox_fields": ["country", "state", "population", "known_for"]
+    },
+    "career": {
+      "sections": ["Overview", "Timeline", "Key transitions"],
+      "infobox_fields": ["total_years", "companies", "current_role"]
+    }
+  },
+  "naming": "lowercase-hyphenated",
+  "wikilink_format": "[[Page Title]]",
+  "citation_format": "footnote-numbered"
+}

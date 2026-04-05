@@ -2,14 +2,19 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 
-const tabs = [
-  { href: "/", label: "Main Page" },
-  { href: "/articles", label: "All articles" },
-  { href: "/sources", label: "Sources" },
-];
+interface WikiTabsProps {
+  personSlug: string;
+}
 
-export default function WikiTabs() {
+export default function WikiTabs({ personSlug }: WikiTabsProps) {
   const pathname = usePathname();
+
+  const tabs = [
+    { href: `/${personSlug}`, label: "Main Page" },
+    { href: `/${personSlug}/articles`, label: "All articles" },
+    { href: `/${personSlug}/sources`, label: "Sources" },
+  ];
+
   return (
     <div className="wiki-tabs">
       {tabs.map((tab) => (

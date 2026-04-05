@@ -55,7 +55,7 @@ export async function generateBatch(
   prompts: { id: string; prompt: string; systemPrompt?: string }[]
 ): Promise<Map<string, string>> {
   const results = new Map<string, string>();
-  const BATCH_SIZE = 5;
+  const BATCH_SIZE = 10;
 
   for (let i = 0; i < prompts.length; i += BATCH_SIZE) {
     const batch = prompts.slice(i, i + BATCH_SIZE);

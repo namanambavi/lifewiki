@@ -1,9 +1,24 @@
 import fs from "fs/promises";
 import path from "path";
 import matter from "gray-matter";
-import type { Article, ArticleFrontmatter, ArticleIndex } from "./types";
+import type { Article, ArticleFrontmatter, ArticleIndex, MainPageData } from "./types";
 
 const WIKI_DIR = path.join(process.cwd(), "data/wiki");
+const USERS_DIR = path.join(process.cwd(), "data/users");
+
+export function getWikiDir(personSlug?: string): string {
+  if (personSlug) {
+    return path.join(USERS_DIR, personSlug, "wiki");
+  }
+  return WIKI_DIR;
+}
+
+export function getRawDir(personSlug?: string): string {
+  if (personSlug) {
+    return path.join(USERS_DIR, personSlug, "raw");
+  }
+  return path.join(process.cwd(), "data/raw");
+}
 
 export async function writeArticle(
   article: Article,
@@ -84,4 +99,32 @@ export async function getAllSlugs(
   }
   await walk(wikiDir, "");
   return slugs;
+}
+
+export async function listPeople(): Promise<{ slug: string; name: string; articleCount: number }[]> {
+  const people: { slug: string; name: string; articleCount: number }[] = [];
+
+  try {
+    const entries = await fs.readdir(USERS_DIR, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const slug = entry.name;
+      const mainPagePath = path.join(USERS_DIR, slug, "wiki", "main-page.json");
+      try {
+        const raw = await fs.readFile(mainPagePath, "utf-8");
+        const data: MainPageData = JSON.parse(raw);
+        people.push({
+          slug,
+          name: data.personName,
+          articleCount: data.totalArticles,
+        });
+      } catch {
+        // Skip directories without a valid main-page.json
+      }
+    }
+  } catch {
+    // data/users/ doesn't exist yet — return empty
+  }
+
+  return people;
 }

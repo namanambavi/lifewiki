@@ -41,3 +41,5 @@ next-env.d.ts
 # data directories
 data/raw/
 data/wiki/
+data/users/
+.gstack/

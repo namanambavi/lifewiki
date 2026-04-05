@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listArticles, readArticle, writeArticle } from "@/lib/wiki-io";
+import { listArticles, readArticle, writeArticle, getWikiDir, getRawDir } from "@/lib/wiki-io";
 import { generateText, generateJSON } from "@/lib/llm";
 import fs from "fs/promises";
 import path from "path";
@@ -7,10 +7,10 @@ import path from "path";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { type, url, content } = body;
+    const { type, url, content, person } = body;
 
     let sourceText = "";
-    const rawDir = path.join(process.cwd(), "data/raw/web");
+    const rawDir = person ? path.join(getRawDir(person), "web") : path.join(process.cwd(), "data/raw/web");
     await fs.mkdir(rawDir, { recursive: true });
 
     if (type === "web" && url) {
@@ -25,7 +25,8 @@ export async function POST(request: NextRequest) {
 
     if (!sourceText) return NextResponse.json({ error: "No content to process" }, { status: 400 });
 
-    const articles = await listArticles();
+    const wikiDir = person ? getWikiDir(person) : undefined;
+    const articles = await listArticles(wikiDir);
     const indexSummary = articles.map(a => `- ${a.title} (${a.slug}): ${a.summary}`).join("\n");
 
     const updates = await generateJSON<{ slug: string; updateInstructions: string }[]>(
@@ -35,15 +36,15 @@ export async function POST(request: NextRequest) {
     let updatedCount = 0;
     for (const update of (Array.isArray(updates) ? updates : [])) {
       try {
-        const article = await readArticle(update.slug);
+        const article = await readArticle(update.slug, wikiDir);
         const updatedContent = await generateText(
           `Update this Wikipedia article based on new information.\n\nCurrent article:\n${article.content}\n\nUpdate instructions: ${update.updateInstructions}\n\nReturn the complete updated article content in markdown. Keep the same style. Add new info naturally.`
         );
         article.content = updatedContent;
         article.frontmatter.last_updated = new Date().toISOString();
-        await writeArticle(article);
+        await writeArticle(article, wikiDir);
         updatedCount++;
-      } catch {}
+      } catch { /* skip */ }
     }
 
     return NextResponse.json({ updated: updatedCount, total: updates?.length || 0 });

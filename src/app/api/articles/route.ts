@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listArticles } from "@/lib/wiki-io";
+import { listArticles, getWikiDir } from "@/lib/wiki-io";
 
 export async function GET(request: NextRequest) {
   try {
-    const articles = await listArticles();
+    const person = request.nextUrl.searchParams.get("person");
+    const wikiDir = person ? getWikiDir(person) : undefined;
+    const articles = await listArticles(wikiDir);
     const query = request.nextUrl.searchParams.get("q")?.toLowerCase();
     if (query) {
       const filtered = articles.filter(a =>

@@ -63,12 +63,19 @@ export interface EntityPlan {
   dataContext: string;    // relevant data snippet for this article
 }
 
+export interface LogEntry {
+  timestamp: string;
+  message: string;
+  type: "info" | "research" | "article" | "error";
+}
+
 export interface GenerationStatus {
   phase: "fetching" | "planning" | "generating" | "finalizing" | "complete" | "error";
   totalArticles: number;
   completedArticles: number;
   currentArticle: string;
   error?: string;
+  log?: LogEntry[];
 }
 
 export interface DidYouKnow {

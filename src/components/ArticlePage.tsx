@@ -4,9 +4,10 @@ import type { Article } from "@/lib/types";
 
 interface Props {
   article: Article;
+  personSlug: string;
 }
 
-export default function ArticlePage({ article }: Props) {
+export default function ArticlePage({ article, personSlug }: Props) {
   const htmlWithIds = addHeadingIds(article.html || "");
   const headings = extractHeadings(htmlWithIds);
 
@@ -28,7 +29,7 @@ export default function ArticlePage({ article }: Props) {
             <span>Categories: </span>
             {article.frontmatter.categories.map((cat, i) => (
               <span key={cat}>
-                <a href={`/search?q=${encodeURIComponent(cat)}`}>{cat}</a>
+                <a href={`/${personSlug}/search?q=${encodeURIComponent(cat)}`}>{cat}</a>
                 {i < article.frontmatter.categories.length - 1 && " · "}
               </span>
             ))}

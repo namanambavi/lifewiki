@@ -2,9 +2,12 @@ import { MainPageData } from "@/lib/types";
 
 interface MainPageProps {
   data: MainPageData;
+  personSlug: string;
 }
 
-export default function MainPage({ data }: MainPageProps) {
+export default function MainPage({ data, personSlug }: MainPageProps) {
+  const prefix = `/${personSlug}`;
+
   return (
     <div className="main-page">
       {/* Welcome Block */}
@@ -12,7 +15,7 @@ export default function MainPage({ data }: MainPageProps) {
         <h2>Welcome to {data.encyclopediaName}</h2>
         <p>
           The free encyclopedia about{" "}
-          <a href={`/wiki/people/${data.featuredArticleSlug.split("/").pop() ?? ""}`}>
+          <a href={`${prefix}/wiki/${data.featuredArticleSlug}`}>
             {data.personName}
           </a>{" "}
           &mdash; built from public career data.
@@ -31,7 +34,7 @@ export default function MainPage({ data }: MainPageProps) {
         <b>Portals:</b>{" "}
         {data.portals.map((portal, index) => (
           <span key={portal.slug}>
-            <a href={`/wiki/${portal.slug}`}>
+            <a href={`${prefix}/wiki/${portal.slug}`}>
               {portal.name} <b>({portal.count})</b>
             </a>
             {index < data.portals.length - 1 && " · "}
@@ -51,7 +54,7 @@ export default function MainPage({ data }: MainPageProps) {
                 dangerouslySetInnerHTML={{ __html: data.featuredArticleSummary }}
               />
               <div className="more">
-                <a href={`/wiki/${data.featuredArticleSlug}`}>Read full article &rarr;</a>
+                <a href={`${prefix}/wiki/${data.featuredArticleSlug}`}>Read full article &rarr;</a>
               </div>
             </div>
           </div>
@@ -81,7 +84,7 @@ export default function MainPage({ data }: MainPageProps) {
               <ul>
                 {data.recentPeople.map((person) => (
                   <li key={person.slug}>
-                    <a href={`/wiki/${person.slug}`}>{person.name}</a>
+                    <a href={`${prefix}/wiki/${person.slug}`}>{person.name}</a>
                     {person.description && ` — ${person.description}`}
                   </li>
                 ))}
@@ -97,7 +100,7 @@ export default function MainPage({ data }: MainPageProps) {
                 {data.careerTimeline.map((entry, index) => (
                   <li key={index}>
                     <b>{entry.year}</b> &mdash;{" "}
-                    <a href={`/wiki/${entry.slug}`}>{entry.event}</a>
+                    <a href={`${prefix}/wiki/${entry.slug}`}>{entry.event}</a>
                   </li>
                 ))}
               </ul>

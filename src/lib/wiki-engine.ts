@@ -1,9 +1,9 @@
 import path from "path";
 import fs from "fs/promises";
+import fsSync from "fs";
 import matter from "gray-matter";
-import { query } from "@anthropic-ai/claude-agent-sdk";
-import { generateText, generateJSON, generateBatch } from "./llm";
-import { writeArticle } from "./wiki-io";
+import { generateText, generateJSON } from "./llm";
+import { getWikiDir } from "./wiki-io";
 import type {
   LinkedInProfile,
   EntityPlan,
@@ -18,14 +18,13 @@ import schema from "../../data/schema.json";
 // Constants
 // ---------------------------------------------------------------------------
 
-const WIKI_DIR = path.join(process.cwd(), "data/wiki");
-const RAW_DIR = path.join(process.cwd(), "data/raw");
+const USERS_DIR = path.join(process.cwd(), "data/users");
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function slugify(title: string): string {
+export function slugify(title: string): string {
   return title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -37,132 +36,29 @@ function todayISO(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Module-level status (single-instance, fine for hackathon)
+// Status
 // ---------------------------------------------------------------------------
 
-let status: GenerationStatus = {
-  phase: "complete",
-  totalArticles: 0,
-  completedArticles: 0,
-  currentArticle: "",
-};
-
-export function getStatus(): GenerationStatus {
-  return { ...status };
-}
-
-// ---------------------------------------------------------------------------
-// PHASE 1: Research via Claude Agent SDK
-//
-// Uses the Agent SDK with built-in WebSearch + WebFetch tools.
-// The agent researches the person, their companies, projects, etc.
-// and returns a structured research report.
-//
-// No custom tool loop needed — the SDK handles everything.
-// ---------------------------------------------------------------------------
-
-async function researchPerson(profile: LinkedInProfile): Promise<string> {
-  const profileSummary = `
-Name: ${profile.name}
-Headline: ${profile.headline}
-Summary: ${profile.summary}
-Location: ${profile.location}
-
-Positions:
-${profile.positions.map((p) => `- ${p.title} at ${p.company} (${p.startDate} - ${p.endDate || "present"}): ${p.description}`).join("\n")}
-
-Education:
-${profile.education.map((e) => `- ${e.degree} in ${e.field} from ${e.school} (${e.startDate} - ${e.endDate})`).join("\n")}
-
-Skills: ${profile.skills.join(", ")}
-
-Connections (sample): ${profile.connections.slice(0, 20).map((c) => `${c.name} (${c.headline})`).join(", ")}
-  `.trim();
-
-  const researchPrompt = `You are a research agent building a comprehensive personal encyclopedia about ${profile.name}.
-
-Here is their LinkedIn profile:
-
-${profileSummary}
-
-Your task:
-1. Search the web for this person — find news mentions, publications, talks, open source projects, interviews
-2. Search for each company they worked at — find funding rounds, acquisitions, notable products, key people
-3. Search for their educational institutions — notable programs, rankings, famous alumni
-4. Fetch any particularly relevant pages for detailed information
-
-After your research, produce a STRUCTURED REPORT with this exact format:
-
-## Research Findings
-
-### About ${profile.name}
-(Everything you found about the person beyond what's in their LinkedIn)
-
-### Companies
-For each company:
-#### [Company Name]
-- What the company does
-- Key facts (founding, funding, acquisition, size)
-- The person's role and contributions
-- Notable colleagues
-
-### Education
-For each school:
-#### [School Name]
-- Key facts about the institution
-- Relevant programs
-- The person's degree and time there
-
-### Technologies & Skills
-For each major skill/technology:
-#### [Technology Name]
-- Brief description
-- How the person uses it
-- Notable projects involving this technology
-
-### Notable Discoveries
-(Anything interesting you found that doesn't fit above — events, publications, projects, awards, life events)
-
-### Suggested Articles
-List every entity that deserves its own Wikipedia article, formatted as:
-- SLUG: people/${profile.name.toLowerCase().replace(/\s+/g, "-")} | TITLE: ${profile.name} | TYPE: person
-- SLUG: companies/[name] | TITLE: [Name] | TYPE: company
-(etc. for all entities)
-
-Be thorough. Search at least 5-8 times. The quality of the encyclopedia depends entirely on how much you discover here.`;
-
-  let researchReport = "";
-
-  for await (const message of query({
-    prompt: researchPrompt,
-    options: {
-      allowedTools: ["WebSearch", "WebFetch"],
-      maxTurns: 25,
-    },
-  })) {
-    // Collect the final result
-    if ("result" in message && typeof message.result === "string") {
-      researchReport = message.result;
-    }
+export function getStatus(personSlug: string): GenerationStatus {
+  const statusPath = path.join(USERS_DIR, personSlug, "generation-status.json");
+  try {
+    const raw = fsSync.readFileSync(statusPath, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return {
+      phase: "complete",
+      totalArticles: 0,
+      completedArticles: 0,
+      currentArticle: "",
+    };
   }
-
-  // Save the raw research to disk
-  const researchDir = path.join(RAW_DIR, "research");
-  await fs.mkdir(researchDir, { recursive: true });
-  await fs.writeFile(
-    path.join(researchDir, `${slugify(profile.name)}-research.md`),
-    researchReport,
-    "utf-8"
-  );
-
-  return researchReport;
 }
 
 // ---------------------------------------------------------------------------
 // PHASE 1.5: Parse research into entity plan
 // ---------------------------------------------------------------------------
 
-async function planFromResearch(
+export async function planFromResearch(
   profile: LinkedInProfile,
   research: string
 ): Promise<EntityPlan[]> {
@@ -408,7 +304,8 @@ export function parseGeneratedArticle(
 
 export async function generateMainPageData(
   profile: LinkedInProfile,
-  plan: EntityPlan[]
+  plan: EntityPlan[],
+  personSlug: string
 ): Promise<void> {
   const firstName = profile.name.split(" ")[0];
   const encyclopediaName = `${firstName}opedia`;
@@ -484,15 +381,16 @@ Make facts specific, surprising, and use [[wikilinks]].`;
     })),
   };
 
-  await fs.mkdir(WIKI_DIR, { recursive: true });
+  const wikiDir = getWikiDir(personSlug);
+  await fs.mkdir(wikiDir, { recursive: true });
   await fs.writeFile(
-    path.join(WIKI_DIR, "main-page.json"),
+    path.join(wikiDir, "main-page.json"),
     JSON.stringify(mainPageData, null, 2),
     "utf-8"
   );
 }
 
-export async function generateIndex(plan: EntityPlan[]): Promise<void> {
+export async function generateIndex(plan: EntityPlan[], personSlug: string): Promise<void> {
   const lines = plan.map((e) => {
     return `- [${e.title}](${e.slug}) — Article about ${e.title} | ${e.type} | ${e.type}`;
   });
@@ -506,95 +404,7 @@ title: Index
 ${lines.join("\n")}
 `;
 
-  await fs.mkdir(WIKI_DIR, { recursive: true });
-  await fs.writeFile(path.join(WIKI_DIR, "index.md"), indexContent, "utf-8");
-}
-
-// ---------------------------------------------------------------------------
-// MAIN PIPELINE
-//
-// Phase 1: Agent SDK researches the person (WebSearch + WebFetch)
-// Phase 1.5: LLM plans articles from research findings
-// Phase 2: Batch-generate all articles from the plan
-// Phase 3: Generate main page + index
-// ---------------------------------------------------------------------------
-
-export async function generateEncyclopedia(
-  profile: LinkedInProfile
-): Promise<void> {
-  try {
-    // ================================================================
-    // PHASE 1: Research via Claude Agent SDK
-    // The agent autonomously searches the web, fetches pages, and
-    // compiles a research report about the person.
-    // ================================================================
-    status = {
-      phase: "fetching",
-      totalArticles: 0,
-      completedArticles: 0,
-      currentArticle:
-        "Researching — the agent is searching the web for information...",
-    };
-
-    const research = await researchPerson(profile);
-
-    // ================================================================
-    // PHASE 1.5: Plan articles from research
-    // LLM reads the research report + LinkedIn profile and plans
-    // which articles to create, with rich context for each.
-    // ================================================================
-    status.phase = "planning";
-    status.currentArticle = "Planning articles from research findings...";
-
-    const plan = await planFromResearch(profile, research);
-    status.totalArticles = plan.length;
-
-    // ================================================================
-    // PHASE 2: Generate articles
-    // Each article is written with the full research context.
-    // ================================================================
-    status.phase = "generating";
-
-    const systemPrompt =
-      "You are a Wikipedia article writer. Write in a neutral, encyclopedic tone. Return raw Markdown with YAML frontmatter — no code fences. Ground every claim in the research context provided.";
-
-    const BATCH_SIZE = 5;
-    for (let i = 0; i < plan.length; i += BATCH_SIZE) {
-      const batch = plan.slice(i, i + BATCH_SIZE);
-      const prompts = batch.map((entity) => ({
-        id: entity.slug,
-        prompt: buildArticlePrompt(entity, profile, plan),
-        systemPrompt,
-      }));
-
-      const batchResults = await generateBatch(prompts);
-
-      for (const entity of batch) {
-        status.currentArticle = entity.title;
-        const rawText = batchResults.get(entity.slug);
-        if (!rawText) continue;
-
-        const article = parseGeneratedArticle(rawText, entity);
-        await writeArticle(article);
-        status.completedArticles++;
-      }
-    }
-
-    // ================================================================
-    // PHASE 3: Finalize
-    // ================================================================
-    status.phase = "finalizing";
-    status.currentArticle = "Main page & index";
-
-    await generateMainPageData(profile, plan);
-    await generateIndex(plan);
-
-    status.phase = "complete";
-    status.currentArticle = "";
-  } catch (err: unknown) {
-    status.phase = "error";
-    status.error =
-      err instanceof Error ? err.message : "Unknown error during generation";
-    throw err;
-  }
+  const wikiDir = getWikiDir(personSlug);
+  await fs.mkdir(wikiDir, { recursive: true });
+  await fs.writeFile(path.join(wikiDir, "index.md"), indexContent, "utf-8");
 }

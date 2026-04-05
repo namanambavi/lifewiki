@@ -1,15 +1,18 @@
 import Link from "next/link";
-import { listArticles } from "@/lib/wiki-io";
+import { listArticles, getWikiDir } from "@/lib/wiki-io";
 
 interface SearchPageProps {
+  params: Promise<{ person: string }>;
   searchParams: Promise<{ q?: string }>;
 }
 
-export default async function SearchPage({ searchParams }: SearchPageProps) {
+export default async function PersonSearchPage({ params, searchParams }: SearchPageProps) {
+  const { person } = await params;
   const { q } = await searchParams;
   const query = q?.toLowerCase() ?? "";
+  const wikiDir = getWikiDir(person);
 
-  const allArticles = await listArticles().catch(() => []);
+  const allArticles = await listArticles(wikiDir).catch(() => []);
 
   const results = query
     ? allArticles.filter(a =>
@@ -35,7 +38,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           {results.map(article => (
             <li key={article.slug} style={{ borderBottom: "1px solid #eaecf0", padding: "12px 0" }}>
               <Link
-                href={`/wiki/${article.slug}`}
+                href={`/${person}/wiki/${article.slug}`}
                 style={{ fontSize: "16px", color: "#3366cc", textDecoration: "none", fontWeight: "bold" }}
               >
                 {article.title}

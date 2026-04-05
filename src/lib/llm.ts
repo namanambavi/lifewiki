@@ -20,12 +20,13 @@ function getClient(): Anthropic {
 
 export async function generateText(
   prompt: string,
-  systemPrompt?: string
+  systemPrompt?: string,
+  maxTokens: number = 4096
 ): Promise<string> {
   const anthropic = getClient();
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 4096,
+    max_tokens: maxTokens,
     system:
       systemPrompt ||
       "You are a Wikipedia article writer. Write in a neutral, encyclopedic tone.",
@@ -42,13 +43,28 @@ export async function generateJSON<T>(
 ): Promise<T> {
   const text = await generateText(
     prompt + "\n\nRespond with valid JSON only. No markdown code fences.",
-    systemPrompt
+    systemPrompt,
+    8192 // larger token limit for JSON responses
   );
-  const cleaned = text
+  let cleaned = text
     .replace(/```json\n?/g, "")
     .replace(/```\n?/g, "")
     .trim();
-  return JSON.parse(cleaned) as T;
+
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    // JSON was truncated (hit token limit). Try to repair:
+    // If it's an array, find the last complete object and close the array
+    if (cleaned.startsWith("[")) {
+      const lastCompleteObj = cleaned.lastIndexOf("}");
+      if (lastCompleteObj > 0) {
+        cleaned = cleaned.slice(0, lastCompleteObj + 1) + "]";
+        return JSON.parse(cleaned) as T;
+      }
+    }
+    throw new Error(`Invalid JSON from LLM: ${text.slice(0, 200)}...`);
+  }
 }
 
 export async function generateBatch(

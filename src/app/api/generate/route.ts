@@ -59,7 +59,8 @@ export async function POST(request: NextRequest) {
     const personSlug = slugify(profile.name);
 
     // Create person directory structure
-    const personDir = path.join(process.cwd(), "data/users", personSlug);
+    const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
+    const personDir = path.join(DATA_DIR, "users", personSlug);
     const rawDir = path.join(personDir, "raw/linkedin");
     await fs.mkdir(rawDir, { recursive: true });
 

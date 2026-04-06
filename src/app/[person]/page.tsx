@@ -12,7 +12,8 @@ interface Props {
 
 export default async function PersonMainPage({ params }: Props) {
   const { person } = await params;
-  const mainPagePath = path.join(process.cwd(), "data/users", person, "wiki", "main-page.json");
+  const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
+  const mainPagePath = path.join(DATA_DIR, "users", person, "wiki", "main-page.json");
 
   try {
     if (!fs.existsSync(mainPagePath)) {

@@ -9,7 +9,8 @@ interface Props {
 
 export async function GET(_request: Request, { params }: Props) {
   const { person } = await params;
-  const statusPath = path.join(process.cwd(), "data/users", person, "generation-status.json");
+  const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
+  const statusPath = path.join(DATA_DIR, "users", person, "generation-status.json");
   try {
     const raw = await fs.readFile(statusPath, "utf-8");
     const status: GenerationStatus = JSON.parse(raw);

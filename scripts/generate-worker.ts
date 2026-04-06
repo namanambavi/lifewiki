@@ -48,7 +48,8 @@ if (!personSlug || !profilePath) {
 // Paths
 // ---------------------------------------------------------------------------
 
-const USERS_DIR = path.join(process.cwd(), "data/users");
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
+const USERS_DIR = path.join(DATA_DIR, "users");
 const PERSON_DIR = path.join(USERS_DIR, personSlug);
 const STATUS_FILE = path.join(PERSON_DIR, "generation-status.json");
 

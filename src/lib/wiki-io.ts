@@ -3,8 +3,13 @@ import path from "path";
 import matter from "gray-matter";
 import type { Article, ArticleFrontmatter, ArticleIndex, MainPageData } from "./types";
 
-const WIKI_DIR = path.join(process.cwd(), "data/wiki");
-const USERS_DIR = path.join(process.cwd(), "data/users");
+// DATA_DIR can be overridden via env var for Railway volume mounts
+// Railway: set DATA_DIR=/data in env vars, mount volume at /data
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
+const WIKI_DIR = path.join(DATA_DIR, "wiki");
+const USERS_DIR = path.join(DATA_DIR, "users");
+
+export { DATA_DIR, USERS_DIR };
 
 export function getWikiDir(personSlug?: string): string {
   if (personSlug) {

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "@/styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "WikiPeople",
-  description: "Your own Wikipedia, generated from LinkedIn",
+  title: "MyLife.wiki",
+  description: "Your life, as a Wikipedia. AI-generated personal encyclopedias.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

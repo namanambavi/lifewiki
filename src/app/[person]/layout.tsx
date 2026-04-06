@@ -13,7 +13,7 @@ export default async function PersonLayout({ children, params }: PersonLayoutPro
   const { person } = await params;
   const mainPagePath = path.join(process.cwd(), "data/users", person, "wiki", "main-page.json");
 
-  let encyclopediaName = "WikiPeople";
+  let encyclopediaName = "MyLife.wiki";
   try {
     if (fs.existsSync(mainPagePath)) {
       const raw = fs.readFileSync(mainPagePath, "utf-8");

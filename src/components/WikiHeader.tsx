@@ -11,7 +11,7 @@ interface WikiHeaderProps {
 export default function WikiHeader({
   encyclopediaName,
   personSlug,
-  repoUrl = "https://github.com/namanambavi/wikipeople",
+  repoUrl = "https://github.com/namanambavi/mylife-wiki",
 }: WikiHeaderProps) {
   const [query, setQuery] = useState("");
   const router = useRouter();

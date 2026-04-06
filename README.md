@@ -1,8 +1,8 @@
-# WikiPeople
+# MyLife.wiki
 
 **Paste a name. Get their entire Wikipedia.**
 
-WikiPeople generates a full, interlinked personal encyclopedia for anyone. Type a name, and an AI research agent searches the web, discovers everything about that person, then compiles 40-50+ Wikipedia-style articles covering their companies, schools, skills, locations, career milestones, and notable connections.
+MyLife.wiki generates a full, interlinked personal encyclopedia for anyone. Type a name, and an AI research agent searches the web, discovers everything about that person, then compiles 40-50+ Wikipedia-style articles covering their companies, schools, skills, locations, career milestones, and notable connections.
 
 Every article has an infobox, table of contents, wikilinks to other articles, footnote citations, and categories -- just like Wikipedia.
 
@@ -39,7 +39,7 @@ Three layers:
 ## Quick start
 
 ```bash
-git clone https://github.com/yourusername/wikipeople.git
+git clone https://github.com/namanambavi/mylife-wiki.git
 cd wikipeople
 npm install
 cp .env.local.example .env.local

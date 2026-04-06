@@ -28,7 +28,11 @@ export default function GenerateForm() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: value }),
+        body: JSON.stringify(
+          value.includes("linkedin.com")
+            ? { linkedinUrl: value }
+            : { name: value }
+        ),
       });
 
       const data = await res.json();
@@ -177,7 +181,7 @@ export default function GenerateForm() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type any name, e.g. 'Elon Musk'"
+          placeholder="Paste a LinkedIn URL or type a name"
           disabled={loading}
           style={{
             padding: "8px 12px",

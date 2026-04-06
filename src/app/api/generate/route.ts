@@ -14,16 +14,28 @@ function slugify(title: string): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name } = body;
+    const { name, linkedinUrl } = body;
 
-    if (!name || typeof name !== "string" || !name.trim()) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    // Extract name from LinkedIn URL or use the provided name
+    let personName: string;
+    let linkedinProfile: string | undefined;
+
+    if (linkedinUrl && typeof linkedinUrl === "string" && linkedinUrl.includes("linkedin.com/in/")) {
+      const match = linkedinUrl.match(/linkedin\.com\/in\/([^/?]+)/);
+      personName = match
+        ? match[1].replace(/\/$/, "").split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+        : "Unknown";
+      linkedinProfile = linkedinUrl.trim();
+    } else if (name && typeof name === "string" && name.trim()) {
+      personName = name.trim();
+    } else {
+      return NextResponse.json({ error: "Paste a LinkedIn URL or type a name" }, { status: 400 });
     }
 
     const profile: LinkedInProfile = {
-      name: name.trim(),
+      name: personName,
       headline: "",
-      summary: "",
+      summary: linkedinProfile ? `LinkedIn: ${linkedinProfile}` : "",
       location: "",
       positions: [],
       education: [],

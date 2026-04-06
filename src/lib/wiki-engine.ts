@@ -1,13 +1,11 @@
 import path from "path";
 import fs from "fs/promises";
-import fsSync from "fs";
 import matter from "gray-matter";
 import { generateText, generateJSON } from "./llm";
 import { getWikiDir } from "./wiki-io";
 import type {
   LinkedInProfile,
   EntityPlan,
-  GenerationStatus,
   MainPageData,
   DidYouKnow,
   ArticleFrontmatter,
@@ -33,25 +31,6 @@ export function slugify(title: string): string {
 
 function todayISO(): string {
   return new Date().toISOString().split("T")[0];
-}
-
-// ---------------------------------------------------------------------------
-// Status
-// ---------------------------------------------------------------------------
-
-export function getStatus(personSlug: string): GenerationStatus {
-  const statusPath = path.join(USERS_DIR, personSlug, "generation-status.json");
-  try {
-    const raw = fsSync.readFileSync(statusPath, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return {
-      phase: "complete",
-      totalArticles: 0,
-      completedArticles: 0,
-      currentArticle: "",
-    };
-  }
 }
 
 // ---------------------------------------------------------------------------

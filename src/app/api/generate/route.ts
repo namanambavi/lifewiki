@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { LinkedInProfile } from "@/lib/types";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { spawn } from "child_process";
 import fs from "fs/promises";
 import path from "path";
@@ -13,6 +14,15 @@ function slugify(title: string): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown";
+    const rateCheck = checkRateLimit(ip);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Rate limit exceeded. Try again in ${rateCheck.retryAfter} seconds.` },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { name, linkedinUrl } = body;
 

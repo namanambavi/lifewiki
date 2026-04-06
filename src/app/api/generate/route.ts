@@ -82,10 +82,12 @@ export async function POST(request: NextRequest) {
       "utf-8"
     );
 
-    // Spawn worker process
+    // Spawn worker process — use tsx from node_modules directly (no npx overhead)
+    const tsxPath = path.join(process.cwd(), "node_modules", ".bin", "tsx");
+    const workerScript = path.join(process.cwd(), "scripts", "generate-worker.ts");
     const worker = spawn(
-      "npx",
-      ["tsx", "scripts/generate-worker.ts", personSlug, profilePath],
+      tsxPath,
+      [workerScript, personSlug, profilePath],
       {
         cwd: process.cwd(),
         stdio: "pipe",

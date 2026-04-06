@@ -11,15 +11,17 @@ function slugify(name: string): string {
 }
 
 export default function GenerateForm() {
-  const [input, setInput] = useState("");
+  const [name, setName] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<GenerationStatus | null>(null);
   const [error, setError] = useState("");
   const router = useRouter();
 
   const startGeneration = useCallback(async () => {
-    const value = input.trim();
-    if (!value || loading) return;
+    const nameVal = name.trim();
+    const urlVal = linkedinUrl.trim();
+    if ((!nameVal && !urlVal) || loading) return;
 
     setLoading(true);
     setError("");
@@ -28,11 +30,10 @@ export default function GenerateForm() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          value.includes("linkedin.com")
-            ? { linkedinUrl: value }
-            : { name: value }
-        ),
+        body: JSON.stringify({
+          name: nameVal || undefined,
+          linkedinUrl: urlVal || undefined,
+        }),
       });
 
       const data = await res.json();
@@ -43,9 +44,8 @@ export default function GenerateForm() {
         return;
       }
 
-      const personSlug = data.personSlug || slugify(value);
+      const personSlug = data.personSlug || slugify(nameVal || "unknown");
 
-      // Start showing progress immediately
       setStatus({
         phase: "fetching",
         totalArticles: 0,
@@ -53,14 +53,12 @@ export default function GenerateForm() {
         currentArticle: "Starting research agent...",
       });
 
-      // Poll for status updates
       const poll = setInterval(async () => {
         try {
           const statusRes = await fetch(`/api/status/${personSlug}`);
           const statusData: GenerationStatus = await statusRes.json();
           setStatus(statusData);
 
-          // Redirect as soon as first article is ready (progressive rendering)
           if (statusData.completedArticles > 0) {
             clearInterval(poll);
             router.push(`/${personSlug}`);
@@ -76,25 +74,18 @@ export default function GenerateForm() {
             setLoading(false);
           }
         } catch {
-          // transient fetch error, keep polling
+          // transient fetch error
         }
       }, 2000);
     } catch {
       setError("Failed to connect to server");
       setLoading(false);
     }
-  }, [input, loading, router]);
+  }, [name, linkedinUrl, loading, router]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     startGeneration();
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      startGeneration();
-    }
   }
 
   // Show progress view
@@ -172,42 +163,66 @@ export default function GenerateForm() {
     );
   }
 
-  // Show form
+  // Show form with two fields
   return (
     <div>
-      <form onSubmit={handleSubmit} style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Paste a LinkedIn URL or type a name"
-          disabled={loading}
-          style={{
-            padding: "8px 12px",
-            border: "2px solid #36c",
-            borderRadius: "4px",
-            width: "400px",
-            fontSize: "14px",
-            opacity: loading ? 0.6 : 1,
-          }}
-        />
+      <form onSubmit={handleSubmit} style={{ maxWidth: "480px", margin: "0 auto" }}>
+        <div style={{ marginBottom: "12px" }}>
+          <label style={{ display: "block", fontSize: "13px", color: "#54595d", marginBottom: "4px", fontFamily: "sans-serif" }}>
+            Full name
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Jensen Huang"
+            disabled={loading}
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              border: "1px solid #a2a9b1",
+              borderRadius: "4px",
+              fontSize: "14px",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ display: "block", fontSize: "13px", color: "#54595d", marginBottom: "4px", fontFamily: "sans-serif" }}>
+            LinkedIn URL <span style={{ color: "#a2a9b1" }}>(optional, improves research)</span>
+          </label>
+          <input
+            type="text"
+            value={linkedinUrl}
+            onChange={(e) => setLinkedinUrl(e.target.value)}
+            placeholder="linkedin.com/in/jensenhuang"
+            disabled={loading}
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              border: "1px solid #a2a9b1",
+              borderRadius: "4px",
+              fontSize: "14px",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
         <button
           type="submit"
-          onClick={(e) => { e.preventDefault(); startGeneration(); }}
-          disabled={loading}
+          disabled={loading || (!name.trim() && !linkedinUrl.trim())}
           style={{
+            width: "100%",
             background: loading ? "#8899bb" : "#36c",
             color: "#fff",
             border: "none",
-            padding: "8px 16px",
+            padding: "10px 16px",
             borderRadius: "4px",
             fontSize: "14px",
             fontWeight: 600,
             cursor: loading ? "wait" : "pointer",
           }}
         >
-          {loading ? "Starting..." : "Generate Wiki"}
+          {loading ? "Starting..." : "Generate Encyclopedia"}
         </button>
       </form>
 
